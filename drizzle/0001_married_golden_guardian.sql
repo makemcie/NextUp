@@ -1,0 +1,1 @@
+ALTER TABLE `visits` ADD `status` text DEFAULT 'waiting' NOT NULL;

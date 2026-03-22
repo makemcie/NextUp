@@ -1,0 +1,13 @@
+{
+	"name": "nextup",
+	"compatibility_date": "2026-02-23",
+	"compatibility_flags": ["nodejs_compat"],
+	"main": "@tanstack/react-start/server-entry",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "nextup",
+			"database_id": "e08269d9-0712-49a2-986c-c10b635351e4"
+		}
+	]
+}

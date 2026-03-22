@@ -1,0 +1,43 @@
+{
+	"name": "vibecode-template",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"check": "biome check --fix --unsafe && tsc --noEmit",
+		"db:push": "mkdir -p data && drizzle-kit push --dialect sqlite --schema ./src/db/schema.ts --url file:data/local.db"
+	},
+	"dependencies": {
+		"@tailwindcss/vite": "^4.2.1",
+		"@tanstack/react-query": "^5.90.21",
+		"@tanstack/react-router": "^1.162.6",
+		"@tanstack/react-start": "^1.162.7",
+		"@tanstack/router-plugin": "^1.162.6",
+		"bcryptjs": "^3.0.3",
+		"clsx": "^2.1.1",
+		"drizzle-orm": "^0.44.0",
+		"lucide-react": "^0.575.0",
+		"nitro": "npm:nitro-nightly@latest",
+		"react": "^19.2.4",
+		"react-dom": "^19.2.4",
+		"tailwind-merge": "^3.5.0",
+		"tailwindcss": "^4.2.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.4",
+		"@cloudflare/vite-plugin": "^1.25.4",
+		"@types/bcryptjs": "^3.0.0",
+		"@types/node": "^25.3.0",
+		"@types/react": "^19.2.14",
+		"@types/react-dom": "^19.2.3",
+		"@vitejs/plugin-react": "^5.1.4",
+		"better-sqlite3": "^11.9.1",
+		"drizzle-kit": "^0.31.0",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1",
+		"vite-tsconfig-paths": "^6.1.1",
+		"wrangler": "^4.68.0"
+	}
+}

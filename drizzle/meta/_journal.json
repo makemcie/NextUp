@@ -1,0 +1,48 @@
+{
+	"version": "7",
+	"dialect": "sqlite",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "6",
+			"when": 1773226461402,
+			"tag": "0000_remarkable_wolf_cub",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "6",
+			"when": 1773228125794,
+			"tag": "0001_married_golden_guardian",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "6",
+			"when": 1773856912083,
+			"tag": "0002_supreme_jackal",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "6",
+			"when": 1774039130809,
+			"tag": "0003_heavy_nightmare",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "6",
+			"when": 1774040625263,
+			"tag": "0004_amusing_bug",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "6",
+			"when": 1774061083132,
+			"tag": "0005_funny_terrax",
+			"breakpoints": true
+		}
+	]
+}
