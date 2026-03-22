@@ -1994,8 +1994,22 @@ function QRView({
 				<h2 className="text-xl font-bold text-white mb-2">{t.qrTitle}</h2>
 				<p className="text-gray-400 mb-6 text-sm">{t.qrDesc}</p>
 
-				<div className="inline-block bg-white p-4 rounded-2xl mb-6">
+				<div className="inline-block bg-white p-4 rounded-2xl mb-4">
 					<img src={qrImageUrl} alt="QR Code" className="w-64 h-64" />
+				</div>
+
+				{/* Download button */}
+				<div className="flex gap-3 justify-center mb-6">
+					<a
+						href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(registerUrl)}&bgcolor=111827&color=f59e0b&format=png`}
+						download={`QR-${shopId}.png`}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl text-sm hover:from-amber-600 hover:to-orange-700 transition-all"
+					>
+						<Download className="w-4 h-4" />
+						{lang === "es" ? "Descargar QR (alta resolución)" : "Download QR (high resolution)"}
+					</a>
 				</div>
 
 				<div className="bg-gray-800 rounded-xl p-4 mb-4">
@@ -2005,6 +2019,19 @@ function QRView({
 					</p>
 				</div>
 
+				{/* Download button */}
+				<div className="flex gap-3 justify-center mb-4">
+					<a
+						href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(registerUrl)}&bgcolor=111827&color=f59e0b&format=png`}
+						download={`QR-${shopId}.png`}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl text-sm hover:from-amber-600 hover:to-orange-700 transition-all"
+					>
+						<Download className="w-4 h-4" />
+						{lang === "es" ? "Descargar QR (alta resolución)" : "Download QR (high resolution)"}
+					</a>
+				</div>
 				<p className="text-gray-500 text-xs">{t.qrTip}</p>
 			</div>
 
