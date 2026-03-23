@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { broadcast, db } from "@/db";
 import { barbers, clients, sessions, shops, users, visits } from "@/db/schema";
-import { sendSMS } from "@/lib/messaging";
+import { sendSMS, sendCalledToChairSMS, sendFollowUpSMS, sendReminderSMS } from "@/lib/messaging";
 
 // ============ SESSION HELPERS ============
 
@@ -722,9 +722,7 @@ export const registerVisit = createServerFn({ method: "POST" })
 		if (
 			data.smsConsented &&
 			shop.smsEnabled &&
-			shop.twilioSid &&
-			shop.twilioToken &&
-			shop.twilioPhone
+			shop.phone
 		) {
 			const welcomeText = (
 				shop.welcomeMessage ?? "Thanks for visiting! Please have a seat."
@@ -735,9 +733,6 @@ export const registerVisit = createServerFn({ method: "POST" })
 				.replace("{shop}", shop.name);
 
 			const smsResult = await sendSMS({
-				twilioSid: shop.twilioSid,
-				twilioToken: shop.twilioToken,
-				twilioPhone: shop.twilioPhone,
 				to: data.phone,
 				body: welcomeText,
 			});
@@ -1076,7 +1071,7 @@ export const processReminders = createServerFn({ method: "POST" }).handler(
 			.all();
 
 		for (const shop of smsShops) {
-			if (!shop.twilioSid || !shop.twilioToken || !shop.twilioPhone) continue;
+			if (!shop.phone) continue;
 
 			const reminderDays = shop.reminderDays ?? 30;
 			const cutoffDate = new Date(
@@ -1298,13 +1293,38 @@ export const callNextClient = createServerFn({ method: "POST" })
 
 		await broadcast({ type: "queue_updated", shopId: data.shopId });
 
-		// Get client name for return
+		// Get client info for SMS
 		const client = await (await db())
-			.select({ name: clients.name })
+			.select({ name: clients.name, phone: clients.phone })
 			.from(clients)
 			.where(eq(clients.id, nextVisit[0].clientId))
 			.limit(1)
 			.all();
+
+		// Get barber and shop info for SMS
+		const barberInfo = await (await db())
+			.select({ name: barbers.name })
+			.from(barbers)
+			.where(eq(barbers.id, nextVisit[0].barberId))
+			.limit(1)
+			.all();
+
+		const shopInfo = await (await db())
+			.select({ name: shops.name })
+			.from(shops)
+			.where(eq(shops.id, data.shopId))
+			.limit(1)
+			.all();
+
+		// Send SMS to client that their turn is ready
+		if (client[0]?.phone) {
+			sendCalledToChairSMS({
+				clientPhone: client[0].phone,
+				clientName: client[0].name,
+				barberName: barberInfo[0]?.name ?? "",
+				shopName: shopInfo[0]?.name ?? "",
+			}).catch(() => {});
+		}
 
 		return { called: true, clientName: client[0]?.name ?? "" };
 	});
@@ -1617,6 +1637,30 @@ export const barberCallNext = createServerFn({ method: "POST" }).handler(
 			.where(eq(visits.id, nextVisit[0].id));
 
 		await broadcast({ type: "queue_updated", shopId: barber[0].shopId });
+
+		// Send SMS to client that their turn is ready
+		const clientInfo = await (await db())
+			.select({ name: clients.name, phone: clients.phone })
+			.from(clients)
+			.where(eq(clients.id, nextVisit[0].clientId))
+			.limit(1)
+			.all();
+
+		const shopInfo2 = await (await db())
+			.select({ name: shops.name })
+			.from(shops)
+			.where(eq(shops.id, barber[0].shopId))
+			.limit(1)
+			.all();
+
+		if (clientInfo[0]?.phone) {
+			sendCalledToChairSMS({
+				clientPhone: clientInfo[0].phone,
+				clientName: clientInfo[0].name,
+				barberName: barber[0].name,
+				shopName: shopInfo2[0]?.name ?? "",
+			}).catch(() => {});
+		}
 
 		const client = await (await db())
 			.select({ name: clients.name })
