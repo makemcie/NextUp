@@ -409,7 +409,7 @@ function RegisterPage() {
 			<div className="border-t border-gray-800/50 py-3 text-center safe-bottom">
 				<p className="text-xs text-gray-700">
 					Powered by{" "}
-					<span className="text-amber-600 font-semibold">NextUp</span>
+					<span className="text-amber-600 font-semibold">Goolinext</span>
 				</p>
 			</div>
 		</div>

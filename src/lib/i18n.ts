@@ -85,7 +85,7 @@ export const reg = {
 // ============ DASHBOARD ============
 export const dash = {
 	es: {
-		dashboard: "NextUp Dashboard",
+		dashboard: "Goolinext Dashboard",
 		// Tabs
 		tabHome: "Inicio",
 		tabQueue: "Cola",
@@ -223,7 +223,7 @@ export const dash = {
 		saving: "Guardando...",
 		saved: "✓ Cambios guardados",
 		// Setup
-		setupTitle: "NextUp",
+		setupTitle: "Goolinext",
 		setupSubtitle: "Configura tu barbería o salón",
 		setupName: "Nombre del negocio *",
 		setupNamePlaceholder: "Ej: Barbería El Rey",
@@ -236,7 +236,7 @@ export const dash = {
 		setupCreating: "Creando...",
 	},
 	en: {
-		dashboard: "NextUp Dashboard",
+		dashboard: "Goolinext Dashboard",
 		// Tabs
 		tabHome: "Home",
 		tabQueue: "Queue",
@@ -372,7 +372,7 @@ export const dash = {
 		saving: "Saving...",
 		saved: "✓ Changes saved",
 		// Setup
-		setupTitle: "NextUp",
+		setupTitle: "Goolinext",
 		setupSubtitle: "Set up your barbershop or salon",
 		setupName: "Business name *",
 		setupNamePlaceholder: "e.g. King's Barbershop",

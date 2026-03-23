@@ -106,7 +106,7 @@ function QueueDisplayPage() {
 			<div className="fixed bottom-0 inset-x-0 border-t border-gray-800/50 bg-gray-950/80 backdrop-blur-xl py-3">
 				<p className="text-center text-xs text-gray-600">
 					Scan the QR code to join the line · Powered by{" "}
-					<span className="text-amber-600 font-semibold">NextUp</span>
+					<span className="text-amber-600 font-semibold">Goolinext</span>
 				</p>
 			</div>
 		</div>

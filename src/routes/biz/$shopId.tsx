@@ -41,8 +41,8 @@ function BusinessPage() {
 	});
 
 	const T = {
-		en: { tagline: "Professional Style", sub: "Where every detail of your image reflects who you are and the level you belong to", call: "Call Now", reviews: "Reviews", findUs: "FIND US", team: "OUR TEAM", today: "TODAY", address: "ADDRESS", phone: "PHONE", googleReviews: "GOOGLE REVIEWS", leaveReview: "Leave us a review ⭐", available: "Available Today", off: "Not Today", hours: "HOURS", open: "Open", closed: "Closed", barbers: "barbers available", barber: "barber available", poweredBy: "Powered by", poweredSub: "Queue management for modern barbershops", openNow: "Open Now", closedNow: "Closed Now" },
-		es: { tagline: "Estilo Profesional", sub: "Donde cada detalle de tu imagen refleja quién eres y el nivel al que perteneces", call: "Llamar", reviews: "Reseñas", findUs: "ENCUÉNTRANOS", team: "NUESTRO EQUIPO", today: "HOY", address: "DIRECCIÓN", phone: "TELÉFONO", googleReviews: "RESEÑAS DE GOOGLE", leaveReview: "Déjanos una reseña ⭐", available: "Disponible Hoy", off: "No Disponible", hours: "HORARIO", open: "Abierto", closed: "Cerrado", barbers: "barberos disponibles", barber: "barbero disponible", poweredBy: "Con tecnología de", poweredSub: "Gestión de turnos para barberías modernas", openNow: "Abierto Ahora", closedNow: "Cerrado Ahora" },
+		en: { tagline: "Professional Barbershop", sub: "Where every detail of your image reflects who you are and the level you belong to", call: "Call Now", reviews: "Reviews", findUs: "FIND US", team: "OUR TEAM", today: "TODAY", address: "ADDRESS", phone: "PHONE", googleReviews: "GOOGLE REVIEWS", leaveReview: "Leave us a review ⭐", available: "Available Today", off: "Not Today", hours: "HOURS", open: "Open", closed: "Closed", barbers: "barbers available", barber: "barber available", poweredBy: "Powered by", poweredSub: "Queue management for modern barbershops", openNow: "Open Now", closedNow: "Closed Now" },
+		es: { tagline: "Barbería Profesional", sub: "Donde cada detalle de tu imagen refleja quién eres y el nivel al que perteneces", call: "Llamar", reviews: "Reseñas", findUs: "ENCUÉNTRANOS", team: "NUESTRO EQUIPO", today: "HOY", address: "DIRECCIÓN", phone: "TELÉFONO", googleReviews: "RESEÑAS DE GOOGLE", leaveReview: "Déjanos una reseña ⭐", available: "Disponible Hoy", off: "No Disponible", hours: "HORARIO", open: "Abierto", closed: "Cerrado", barbers: "barberos disponibles", barber: "barbero disponible", poweredBy: "Con tecnología de", poweredSub: "Gestión de turnos para barberías modernas", openNow: "Abierto Ahora", closedNow: "Cerrado Ahora" },
 	}[lang];
 
 	const DAY = lang === "es" ? DAY_ES : DAY_EN;
@@ -293,7 +293,7 @@ function BusinessPage() {
 				<div style={{ borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:28,textAlign:"center",marginTop:48 }}>
 					<div style={{ display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginBottom:6 }}>
 						<div style={{ width:20,height:20,borderRadius:6,background:"linear-gradient(135deg,#f97316,#ea580c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10 }}>✂️</div>
-						<span style={{ fontSize:12,color:"#64748b" }}>{T.poweredBy} <span style={{ color:"#f97316",fontWeight:700 }}>NextUp</span></span>
+						<span style={{ fontSize:12,color:"#64748b" }}>{T.poweredBy} <span style={{ color:"#f97316",fontWeight:700 }}>Goolinext</span></span>
 					</div>
 					<p style={{ fontSize:11,color:"#334155" }}>{T.poweredSub}</p>
 				</div>
