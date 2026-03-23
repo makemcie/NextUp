@@ -73,6 +73,7 @@ import {
 	updateClient,
 	updateMyBarberPhoto,
 	updateShop,
+	sendSupportEmail,
 } from "@/lib/server-fns";
 import { useWebSocket } from "@/lib/websocket";
 
@@ -849,7 +850,7 @@ function Dashboard({
 }) {
 	const t = dash[lang];
 	const [activeTab, setActiveTab] = useState<
-		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings"
+		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help"
 	>("dashboard");
 
 	// Poll for pending follow-ups every 2 minutes
@@ -879,6 +880,7 @@ function Dashboard({
 		{ key: "qr" as const, label: t.tabQR, icon: QrCode },
 		{ key: "clients" as const, label: t.tabClients, icon: Database },
 		{ key: "settings" as const, label: t.tabSettings, icon: Settings },
+		{ key: "help" as const, label: lang === "es" ? "Ayuda" : "Help", icon: Bell },
 	];
 
 	return (
@@ -939,6 +941,7 @@ function Dashboard({
 					<ClientsView shopId={shop.id} lang={lang} />
 				)}
 				{activeTab === "settings" && <SettingsView shop={shop} lang={lang} />}
+				{activeTab === "help" && <HelpView shopName={shop.name} lang={lang} />}
 			</div>
 		</div>
 	);
@@ -2439,6 +2442,133 @@ function ClientsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 					</div>
 				</div>
 			)}
+		</div>
+	);
+}
+
+
+// ============ HELP VIEW ============
+
+function HelpView({ shopName, lang }: { shopName: string; lang: Lang }) {
+	const [subject, setSubject] = useState("");
+	const [message, setMessage] = useState("");
+	const [email, setEmail] = useState("");
+	const [sent, setSent] = useState(false);
+
+	const mutation = useMutation({
+		mutationFn: () => sendSupportEmail({
+			data: { subject, message, shopName, userEmail: email },
+		}),
+		onSuccess: () => {
+			setSent(true);
+			setSubject("");
+			setMessage("");
+			setEmail("");
+		},
+	});
+
+	if (sent) {
+		return (
+			<div className="max-w-lg mx-auto">
+				<div className="bg-gray-900/60 border border-green-500/30 rounded-2xl p-8 text-center">
+					<div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+						<Check className="w-8 h-8 text-green-400" />
+					</div>
+					<h2 className="text-xl font-bold text-white mb-2">
+						{lang === "es" ? "¡Mensaje enviado!" : "Message sent!"}
+					</h2>
+					<p className="text-gray-400 text-sm mb-6">
+						{lang === "es"
+							? "Hemos recibido tu mensaje. Te responderemos pronto."
+							: "We received your message. We will get back to you soon."}
+					</p>
+					<button
+						type="button"
+						onClick={() => setSent(false)}
+						className="px-6 py-2.5 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-all text-sm font-medium"
+					>
+						{lang === "es" ? "Enviar otro mensaje" : "Send another message"}
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="max-w-lg mx-auto space-y-4">
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-6">
+				<div className="flex items-center gap-3 mb-6">
+					<div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+						<Bell className="w-5 h-5 text-amber-400" />
+					</div>
+					<div>
+						<h2 className="text-lg font-bold text-white">
+							{lang === "es" ? "Centro de Ayuda" : "Help Center"}
+						</h2>
+						<p className="text-sm text-gray-500">
+							{lang === "es"
+								? "¿Tienes algún problema? Escríbenos y te ayudamos."
+								: "Having an issue? Write to us and we will help you."}
+						</p>
+					</div>
+				</div>
+
+				<div className="space-y-4">
+					<div>
+						<label className="block text-sm font-medium text-gray-300 mb-1">
+							{lang === "es" ? "Tu email" : "Your email"}
+						</label>
+						<input
+							type="email"
+							value={email}
+							onChange={(e) => setEmail(e.target.value)}
+							placeholder={lang === "es" ? "tu@email.com" : "you@email.com"}
+							className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+						/>
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-gray-300 mb-1">
+							{lang === "es" ? "Asunto" : "Subject"}
+						</label>
+						<input
+							type="text"
+							value={subject}
+							onChange={(e) => setSubject(e.target.value)}
+							placeholder={lang === "es" ? "¿En qué podemos ayudarte?" : "How can we help you?"}
+							className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+						/>
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-gray-300 mb-1">
+							{lang === "es" ? "Mensaje" : "Message"}
+						</label>
+						<textarea
+							value={message}
+							onChange={(e) => setMessage(e.target.value)}
+							rows={5}
+							placeholder={lang === "es"
+								? "Describe tu problema o pregunta en detalle..."
+								: "Describe your issue or question in detail..."}
+							className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
+						/>
+					</div>
+					{mutation.isError && (
+						<p className="text-red-400 text-sm">
+							{lang === "es" ? "Error al enviar. Intenta de nuevo." : "Failed to send. Please try again."}
+						</p>
+					)}
+					<button
+						type="button"
+						onClick={() => mutation.mutate()}
+						disabled={!subject.trim() || !message.trim() || !email.trim() || mutation.isPending}
+						className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition-all"
+					>
+						{mutation.isPending
+							? (lang === "es" ? "Enviando..." : "Sending...")
+							: (lang === "es" ? "Enviar mensaje" : "Send message")}
+					</button>
+				</div>
+			</div>
 		</div>
 	);
 }

@@ -1726,3 +1726,47 @@ export const unlinkBarber = createServerFn({ method: "POST" })
 			);
 		return { success: true, newCode };
 	});
+
+// ============ SUPPORT / HELP ============
+
+export const sendSupportEmail = createServerFn({ method: "POST" })
+	.inputValidator((input: { subject: string; message: string; shopName: string; userEmail: string }) => input)
+	.handler(async ({ data }) => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		// Get RESEND_API_KEY from env
+		const mod = await import("cloudflare:workers");
+		const apiKey = (mod.env as Record<string, string>).RESEND_API_KEY;
+		if (!apiKey) throw new Error("RESEND_API_KEY not configured");
+
+		const response = await fetch("https://api.resend.com/emails", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Authorization": `Bearer ${apiKey}`,
+			},
+			body: JSON.stringify({
+				from: "Goolinext Support <onboarding@resend.dev>",
+				to: ["Makemciellc@gmail.com"],
+				reply_to: data.userEmail,
+				subject: `[Goolinext Support] ${data.subject} - ${data.shopName}`,
+				html: `
+					<h2>Nuevo mensaje de soporte</h2>
+					<p><strong>Negocio:</strong> ${data.shopName}</p>
+					<p><strong>Email:</strong> ${data.userEmail}</p>
+					<p><strong>Asunto:</strong> ${data.subject}</p>
+					<hr/>
+					<p><strong>Mensaje:</strong></p>
+					<p>${data.message.replace(/\n/g, "<br/>")}</p>
+				`,
+			}),
+		});
+
+		if (!response.ok) {
+			const error = await response.text();
+			throw new Error(`Failed to send email: ${error}`);
+		}
+
+		return { success: true };
+	});
