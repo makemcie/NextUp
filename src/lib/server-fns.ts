@@ -5,7 +5,25 @@ import bcrypt from "bcryptjs";
 import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { broadcast, db } from "@/db";
 import { barbers, clients, sessions, shops, users, visits } from "@/db/schema";
-import { sendSMS, sendCalledToChairSMS, sendFollowUpSMS, sendReminderSMS } from "@/lib/messaging";
+import { sendSMS } from "@/lib/messaging";
+
+async function getTwilioCreds() {
+	const mod = await import("cloudflare:workers");
+	const env = mod.env as Record<string, string>;
+	return {
+		sid: env.TWILIO_SID ?? "",
+		token: env.TWILIO_TOKEN ?? "",
+		phone: env.TWILIO_PHONE ?? "",
+	};
+}
+
+async function sendSmsSafe(to: string, body: string): Promise<void> {
+	try {
+		const creds = await getTwilioCreds();
+		if (!creds.sid || !creds.token || !creds.phone) return;
+		await sendSMS({ to, body, twilioSid: creds.sid, twilioToken: creds.token, twilioPhone: creds.phone });
+	} catch {}
+}
 
 // ============ SESSION HELPERS ============
 
@@ -16,6 +34,7 @@ function generateSessionId(): string {
 }
 
 const SESSION_COOKIE = "nextup_session";
+
 const SESSION_DURATION_DAYS = 30;
 
 async function getSessionUser(): Promise<{ id: number; email: string } | null> {
@@ -732,9 +751,13 @@ export const registerVisit = createServerFn({ method: "POST" })
 				.replace("{barberia}", shop.name)
 				.replace("{shop}", shop.name);
 
+			const twilio = await getTwilioCreds();
 			const smsResult = await sendSMS({
 				to: data.phone,
 				body: welcomeText,
+				twilioSid: twilio.sid,
+				twilioToken: twilio.token,
+				twilioPhone: twilio.phone,
 			});
 			smsSent = smsResult.success;
 		}
@@ -1025,10 +1048,11 @@ export const processFollowUps = createServerFn({ method: "POST" }).handler(
 						message += `\n\n⭐ Leave us a review here: ${shop.googleReviewLink}`;
 					}
 
+					const twilioF = await getTwilioCreds();
 					const result = await sendSMS({
-						twilioSid: shop.twilioSid,
-						twilioToken: shop.twilioToken,
-						twilioPhone: shop.twilioPhone,
+						twilioSid: twilioF.sid,
+						twilioToken: twilioF.token,
+						twilioPhone: twilioF.phone,
 						to: client.phone,
 						body: message,
 					});
@@ -1115,10 +1139,11 @@ export const processReminders = createServerFn({ method: "POST" }).handler(
 						.replace("{barberia}", shop.name)
 						.replace("{shop}", shop.name);
 
+					const twilioF = await getTwilioCreds();
 					const result = await sendSMS({
-						twilioSid: shop.twilioSid,
-						twilioToken: shop.twilioToken,
-						twilioPhone: shop.twilioPhone,
+						twilioSid: twilioF.sid,
+						twilioToken: twilioF.token,
+						twilioPhone: twilioF.phone,
 						to: client.phone,
 						body: message,
 					});
@@ -1318,12 +1343,7 @@ export const callNextClient = createServerFn({ method: "POST" })
 
 		// Send SMS to client that their turn is ready
 		if (client[0]?.phone) {
-			sendCalledToChairSMS({
-				clientPhone: client[0].phone,
-				clientName: client[0].name,
-				barberName: barberInfo[0]?.name ?? "",
-				shopName: shopInfo[0]?.name ?? "",
-			}).catch(() => {});
+			sendSmsSafe(client[0].phone, `💈 ${barberInfo[0]?.name ?? "Your barber"} is ready for you at ${shopInfo[0]?.name ?? "the shop"}. Please come to the chair now!`).catch(() => {});
 		}
 
 		return { called: true, clientName: client[0]?.name ?? "" };
@@ -1654,12 +1674,7 @@ export const barberCallNext = createServerFn({ method: "POST" }).handler(
 			.all();
 
 		if (clientInfo[0]?.phone) {
-			sendCalledToChairSMS({
-				clientPhone: clientInfo[0].phone,
-				clientName: clientInfo[0].name,
-				barberName: barber[0].name,
-				shopName: shopInfo2[0]?.name ?? "",
-			}).catch(() => {});
+			sendSmsSafe(clientInfo[0].phone, `💈 ${barber[0].name} is ready for you at ${shopInfo2[0]?.name ?? "the shop"}. Please come to the chair now!`).catch(() => {});
 		}
 
 		const client = await (await db())

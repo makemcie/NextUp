@@ -1,16 +1,15 @@
-// Twilio SMS sending utility
+// Twilio SMS — uses global Goolinext credentials passed from server functions
 
 export async function sendSMS(params: {
 	to: string;
 	body: string;
-	twilioSid: string;
-	twilioToken: string;
-	twilioPhone: string;
-}): Promise<{ success: boolean; error?: string; sid?: string }> {
+	sid: string;
+	token: string;
+	phone: string;
+}): Promise<{ success: boolean; error?: string }> {
 	try {
-		const url = `https://api.twilio.com/2010-04-01/Accounts/${params.twilioSid}/Messages.json`;
-		const auth = btoa(`${params.twilioSid}:${params.twilioToken}`);
-
+		const url = `https://api.twilio.com/2010-04-01/Accounts/${params.sid}/Messages.json`;
+		const auth = btoa(`${params.sid}:${params.token}`);
 		const response = await fetch(url, {
 			method: "POST",
 			headers: {
@@ -19,18 +18,13 @@ export async function sendSMS(params: {
 			},
 			body: new URLSearchParams({
 				To: params.to,
-				From: params.twilioPhone,
+				From: params.phone,
 				Body: params.body,
 			}),
 		});
-
-		const data = (await response.json()) as any;
-
-		if (!response.ok) {
-			return { success: false, error: data.message || `HTTP ${response.status}` };
-		}
-
-		return { success: true, sid: data.sid };
+		const data = (await response.json()) as { message?: string };
+		if (!response.ok) return { success: false, error: data.message };
+		return { success: true };
 	} catch (e: any) {
 		return { success: false, error: e.message };
 	}
