@@ -1747,7 +1747,7 @@ export const sendSupportEmail = createServerFn({ method: "POST" })
 				"Authorization": `Bearer ${apiKey}`,
 			},
 			body: JSON.stringify({
-				from: "Goolinext Support <onboarding@resend.dev>",
+				from: "Goolinext Support <support@goolinext.com>",
 				to: ["Makemciellc@gmail.com"],
 				reply_to: data.userEmail,
 				subject: `[Goolinext Support] ${data.subject} - ${data.shopName}`,
