@@ -1,5 +1,5 @@
 {
-	"name": "goolinext",
+	"name": "nextup",
 	"compatibility_date": "2026-02-23",
 	"compatibility_flags": ["nodejs_compat"],
 	"main": "@tanstack/react-start/server-entry",
