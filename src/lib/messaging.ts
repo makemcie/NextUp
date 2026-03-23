@@ -1,29 +1,25 @@
 // Twilio SMS sending utility — uses global Goolinext Twilio credentials
 
-async function getGlobalTwilio() {
-	const mod = await import("cloudflare:workers");
-	const env = mod.env as Record<string, string>;
-	return {
-		sid: env.TWILIO_SID,
-		token: env.TWILIO_TOKEN,
-		phone: env.TWILIO_PHONE,
-	};
-}
-
 export async function sendSMS(params: {
 	to: string;
 	body: string;
-	// Legacy params (ignored if global credentials exist)
 	twilioSid?: string;
 	twilioToken?: string;
 	twilioPhone?: string;
 }): Promise<{ success: boolean; error?: string; sid?: string }> {
 	try {
-		// Always use global Goolinext Twilio credentials
-		const twilio = await getGlobalTwilio();
-		const sid = twilio.sid || params.twilioSid;
-		const token = twilio.token || params.twilioToken;
-		const phone = twilio.phone || params.twilioPhone;
+		let sid = params.twilioSid;
+		let token = params.twilioToken;
+		let phone = params.twilioPhone;
+
+		// Try to get global credentials from Cloudflare env
+		try {
+			const mod = await import("cloudflare:workers");
+			const env = mod.env as Record<string, string>;
+			if (env.TWILIO_SID) sid = env.TWILIO_SID;
+			if (env.TWILIO_TOKEN) token = env.TWILIO_TOKEN;
+			if (env.TWILIO_PHONE) phone = env.TWILIO_PHONE;
+		} catch {}
 
 		if (!sid || !token || !phone) {
 			return { success: false, error: "Twilio credentials not configured" };
@@ -48,10 +44,7 @@ export async function sendSMS(params: {
 		const data = (await response.json()) as any;
 
 		if (!response.ok) {
-			return {
-				success: false,
-				error: data.message || `HTTP ${response.status}`,
-			};
+			return { success: false, error: data.message || `HTTP ${response.status}` };
 		}
 
 		return { success: true, sid: data.sid };
@@ -60,7 +53,6 @@ export async function sendSMS(params: {
 	}
 }
 
-// Send SMS when barber calls client to the chair
 export async function sendCalledToChairSMS(params: {
 	clientPhone: string;
 	clientName: string;
@@ -73,7 +65,6 @@ export async function sendCalledToChairSMS(params: {
 	});
 }
 
-// Send SMS 2.5-3 hours after visit - thank you + Google Review
 export async function sendFollowUpSMS(params: {
 	clientPhone: string;
 	clientName: string;
@@ -89,7 +80,6 @@ export async function sendFollowUpSMS(params: {
 	});
 }
 
-// Send SMS 30 days after last visit
 export async function sendReminderSMS(params: {
 	clientPhone: string;
 	clientName: string;
@@ -101,7 +91,6 @@ export async function sendReminderSMS(params: {
 	});
 }
 
-// Send SMS when appointment is confirmed
 export async function sendAppointmentConfirmationSMS(params: {
 	clientPhone: string;
 	clientName: string;
@@ -116,7 +105,6 @@ export async function sendAppointmentConfirmationSMS(params: {
 	});
 }
 
-// Send SMS 2 hours before appointment
 export async function sendAppointmentReminderSMS(params: {
 	clientPhone: string;
 	clientName: string;
@@ -130,24 +118,20 @@ export async function sendAppointmentReminderSMS(params: {
 	});
 }
 
-// Send SMS to barber when new appointment is booked
 export async function sendBarberNewAppointmentSMS(params: {
 	barberPhone: string;
-	barberName: string;
 	clientName: string;
 	date: string;
 	time: string;
 }): Promise<void> {
 	await sendSMS({
 		to: params.barberPhone,
-		body: `📅 New appointment!\nClient: ${params.clientName}\n${params.date} at ${params.time}\nCheck your portal for details.`,
+		body: `📅 New appointment!\nClient: ${params.clientName}\n${params.date} at ${params.time}`,
 	});
 }
 
-// Send SMS to barber when appointment is cancelled
 export async function sendBarberCancellationSMS(params: {
 	barberPhone: string;
-	barberName: string;
 	clientName: string;
 	date: string;
 	time: string;
