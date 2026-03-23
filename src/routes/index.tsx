@@ -2496,6 +2496,27 @@ function HelpView({ shopName, lang }: { shopName: string; lang: Lang }) {
 
 	return (
 		<div className="max-w-lg mx-auto space-y-4">
+			{/* WhatsApp button */}
+			<a
+				href="https://wa.me/16465154329"
+				target="_blank"
+				rel="noopener noreferrer"
+				className="flex items-center gap-4 p-5 bg-green-500/10 border border-green-500/30 rounded-2xl hover:bg-green-500/20 transition-all"
+			>
+				<div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+					<span style={{ fontSize: 24 }}>💬</span>
+				</div>
+				<div>
+					<p className="text-white font-bold text-sm">
+						{lang === "es" ? "Chatea con nosotros en WhatsApp" : "Chat with us on WhatsApp"}
+					</p>
+					<p className="text-green-400 text-xs mt-0.5">
+						{lang === "es" ? "Respuesta rápida • Soporte directo" : "Fast response • Direct support"}
+					</p>
+				</div>
+				<span className="ml-auto text-green-400">↗</span>
+			</a>
+
 			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-6">
 				<div className="flex items-center gap-3 mb-6">
 					<div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
@@ -2503,7 +2524,7 @@ function HelpView({ shopName, lang }: { shopName: string; lang: Lang }) {
 					</div>
 					<div>
 						<h2 className="text-lg font-bold text-white">
-							{lang === "es" ? "Centro de Ayuda" : "Help Center"}
+							{lang === "es" ? "Envíanos un mensaje" : "Send us a message"}
 						</h2>
 						<p className="text-sm text-gray-500">
 							{lang === "es"
