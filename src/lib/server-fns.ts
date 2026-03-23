@@ -1748,7 +1748,7 @@ export const sendSupportEmail = createServerFn({ method: "POST" })
 			},
 			body: JSON.stringify({
 				from: "Goolinext Support <support@goolinext.com>",
-				to: ["Makemciellc@gmail.com"],
+				to: ["support@goolinext.com"],
 				reply_to: data.userEmail,
 				subject: `[Goolinext Support] ${data.subject} - ${data.shopName}`,
 				html: `
