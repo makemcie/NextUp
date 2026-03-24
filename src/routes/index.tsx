@@ -78,6 +78,11 @@ import {
 	getSubscriptionStatus,
 	cancelSubscription,
 	activateSubscription,
+	getShopAppointments,
+	cancelAppointment,
+	getAvailableSlots,
+	createAppointment,
+	processAppointmentReminders,
 } from "@/lib/server-fns";
 import { useWebSocket } from "@/lib/websocket";
 
@@ -854,7 +859,7 @@ function Dashboard({
 }) {
 	const t = dash[lang];
 	const [activeTab, setActiveTab] = useState<
-		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help"
+		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help" | "appointments"
 	>("dashboard");
 
 	const { data: subStatus, isLoading: subLoading, refetch: refetchSub } = useQuery({
@@ -894,6 +899,7 @@ function Dashboard({
 	useEffect(() => {
 		const run = () => {
 			processReminders().catch(() => {});
+			processAppointmentReminders().catch(() => {});
 		};
 		run();
 		const interval = setInterval(run, 30 * 60 * 1000);
@@ -907,6 +913,7 @@ function Dashboard({
 		{ key: "qr" as const, label: t.tabQR, icon: QrCode },
 		{ key: "clients" as const, label: t.tabClients, icon: Database },
 		{ key: "settings" as const, label: t.tabSettings, icon: Settings },
+		{ key: "appointments" as const, label: lang === "es" ? "Citas" : "Appts", icon: CalendarCheck },
 		{ key: "help" as const, label: lang === "es" ? "Ayuda" : "Help", icon: Bell },
 	];
 
@@ -975,6 +982,7 @@ function Dashboard({
 					<ClientsView shopId={shop.id} lang={lang} />
 				)}
 				{activeTab === "settings" && <SettingsView shop={shop} lang={lang} />}
+				{activeTab === "appointments" && <AppointmentsView shopId={shop.id} lang={lang} />}
 				{activeTab === "help" && <HelpView shopName={shop.name} lang={lang} />}
 			</div>
 		</div>
@@ -2567,6 +2575,128 @@ function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () =
 // ============ SUBSCRIPTION BANNER ============
 function SubscriptionBanner({ lang }: { lang: Lang }) {
 	return null; // Banner replaced by paywall
+}
+
+
+// ============ APPOINTMENTS VIEW ============
+function AppointmentsView({ shopId, lang }: { shopId: number; lang: Lang }) {
+	const queryClient = useQueryClient();
+	const today = new Date().toISOString().split("T")[0];
+	const [selectedDate, setSelectedDate] = useState(today);
+	const [showNewForm, setShowNewForm] = useState(false);
+	const [newAppt, setNewAppt] = useState({ barberId: 0, clientName: "", clientPhone: "", date: today, time: "", notes: "" });
+
+	const { data: barberList } = useQuery({
+		queryKey: ["barbers", shopId],
+		queryFn: () => getBarbers({ data: { shopId } }),
+	});
+
+	const { data: appts, isLoading } = useQuery({
+		queryKey: ["shopAppointments", shopId, selectedDate],
+		queryFn: () => getShopAppointments({ data: { shopId, date: selectedDate } }),
+		refetchInterval: 30000,
+	});
+
+	const { data: slots } = useQuery({
+		queryKey: ["availableSlots", newAppt.barberId, newAppt.date],
+		queryFn: () => getAvailableSlots({ data: { shopId, barberId: newAppt.barberId, date: newAppt.date } }),
+		enabled: !!newAppt.barberId && !!newAppt.date,
+	});
+
+	const createMutation = useMutation({
+		mutationFn: () => createAppointment({ data: { shopId, barberId: newAppt.barberId, clientName: newAppt.clientName, clientPhone: newAppt.clientPhone, date: newAppt.date, time: newAppt.time, notes: newAppt.notes } }),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["shopAppointments", shopId] });
+			setShowNewForm(false);
+			setNewAppt({ barberId: 0, clientName: "", clientPhone: "", date: today, time: "", notes: "" });
+		},
+	});
+
+	const cancelMutation = useMutation({
+		mutationFn: (appointmentId: number) => cancelAppointment({ data: { appointmentId, shopId } }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopAppointments", shopId] }),
+	});
+
+	function fmt12(t: string) {
+		const [h, m] = t.split(":").map(Number);
+		const ampm = h >= 12 ? "PM" : "AM";
+		return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${ampm}`;
+	}
+
+	return (
+		<div className="space-y-4">
+			<div className="flex items-center justify-between">
+				<h2 className="text-lg font-semibold text-white">{lang === "es" ? "Citas" : "Appointments"}</h2>
+				<button type="button" onClick={() => setShowNewForm(!showNewForm)} className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-all text-sm font-medium">
+					<Plus className="w-4 h-4" />
+					{lang === "es" ? "Nueva cita" : "New appointment"}
+				</button>
+			</div>
+
+			{/* Date selector */}
+			<div className="flex items-center gap-3">
+				<input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-sm" />
+				<span className="text-gray-500 text-sm">{appts?.length ?? 0} {lang === "es" ? "citas" : "appointments"}</span>
+			</div>
+
+			{/* New appointment form */}
+			{showNewForm && (
+				<div className="bg-gray-900/60 border border-amber-500/20 rounded-2xl p-5 space-y-3">
+					<h3 className="text-white font-semibold">{lang === "es" ? "Nueva Cita" : "New Appointment"}</h3>
+					<select value={newAppt.barberId} onChange={(e) => setNewAppt(p => ({ ...p, barberId: Number(e.target.value), time: "" }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50">
+						<option value={0}>{lang === "es" ? "Seleccionar barbero" : "Select barber"}</option>
+						{barberList?.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+					</select>
+					<input type="text" placeholder={lang === "es" ? "Nombre del cliente" : "Client name"} value={newAppt.clientName} onChange={(e) => setNewAppt(p => ({ ...p, clientName: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
+					<input type="tel" placeholder={lang === "es" ? "Teléfono del cliente" : "Client phone"} value={newAppt.clientPhone} onChange={(e) => setNewAppt(p => ({ ...p, clientPhone: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
+					<input type="date" value={newAppt.date} onChange={(e) => setNewAppt(p => ({ ...p, date: e.target.value, time: "" }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
+					{slots?.slots && slots.slots.length > 0 && (
+						<select value={newAppt.time} onChange={(e) => setNewAppt(p => ({ ...p, time: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50">
+							<option value="">{lang === "es" ? "Seleccionar hora" : "Select time"}</option>
+							{slots.slots.map(s => <option key={s} value={s}>{fmt12(s)}</option>)}
+						</select>
+					)}
+					<input type="text" placeholder={lang === "es" ? "Notas (opcional)" : "Notes (optional)"} value={newAppt.notes} onChange={(e) => setNewAppt(p => ({ ...p, notes: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
+					<div className="flex gap-3">
+						<button type="button" onClick={() => setShowNewForm(false)} className="flex-1 py-3 bg-gray-800 text-gray-300 rounded-xl hover:bg-gray-700 transition-all text-sm font-medium">{lang === "es" ? "Cancelar" : "Cancel"}</button>
+						<button type="button" onClick={() => createMutation.mutate()} disabled={!newAppt.barberId || !newAppt.clientName || !newAppt.clientPhone || !newAppt.time || createMutation.isPending} className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition-all text-sm">
+							{createMutation.isPending ? "..." : (lang === "es" ? "Confirmar cita" : "Confirm appointment")}
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Appointments list */}
+			{isLoading ? (
+				<div className="text-center py-8 text-gray-500 animate-pulse">{lang === "es" ? "Cargando..." : "Loading..."}</div>
+			) : appts && appts.length > 0 ? (
+				<div className="space-y-3">
+					{appts.map(appt => (
+						<div key={appt.id} className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 flex items-center justify-between gap-3">
+							<div className="flex items-center gap-3">
+								<div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+									<CalendarCheck className="w-5 h-5 text-amber-400" />
+								</div>
+								<div>
+									<p className="text-white font-semibold text-sm">{appt.clientName}</p>
+									<p className="text-gray-500 text-xs">{fmt12(appt.appointmentTime)} · {appt.barberName}</p>
+									{appt.clientPhone && <p className="text-gray-600 text-xs">{appt.clientPhone}</p>}
+								</div>
+							</div>
+							<button type="button" onClick={() => cancelMutation.mutate(appt.id)} disabled={cancelMutation.isPending} className="p-2 text-gray-500 hover:text-red-400 transition-colors flex-shrink-0">
+								<X className="w-4 h-4" />
+							</button>
+						</div>
+					))}
+				</div>
+			) : (
+				<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 text-center">
+					<CalendarCheck className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+					<p className="text-gray-500 text-sm">{lang === "es" ? "No hay citas para este día" : "No appointments for this day"}</p>
+				</div>
+			)}
+		</div>
+	);
 }
 
 // ============ HELP VIEW ============

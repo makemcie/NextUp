@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { getActiveBarbers, getShopPublicFull, getShopLogo } from "@/lib/server-fns";
+import { getActiveBarbers, getShopPublicFull, getShopLogo, getAvailableSlots, createAppointment } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/biz/$shopId")({
 	component: BusinessPage,
@@ -22,6 +22,14 @@ function BusinessPage() {
 	const { shopId } = Route.useParams();
 	const id = Number(shopId);
 	const [lang, setLang] = useState<"en"|"es">("en");
+	const [showApptForm, setShowApptForm] = useState(false);
+	const [apptStep, setApptStep] = useState(1); // 1=select barber/date, 2=select time, 3=client info, 4=confirmed
+	const [apptBarber, setApptBarber] = useState(0);
+	const [apptDate, setApptDate] = useState("");
+	const [apptTime, setApptTime] = useState("");
+	const [apptName, setApptName] = useState("");
+	const [apptPhone, setApptPhone] = useState("");
+	const [apptLoading, setApptLoading] = useState(false);
 
 	const { data: shop, isLoading } = useQuery({
 		queryKey: ["shopPublicFull", id],
@@ -38,6 +46,12 @@ function BusinessPage() {
 		queryKey: ["activeBarbers", id],
 		queryFn: () => getActiveBarbers({ data: { shopId: id } }),
 		enabled: !!shop,
+	});
+
+	const { data: availableSlots } = useQuery({
+		queryKey: ["availableSlots", id, apptBarber, apptDate],
+		queryFn: () => getAvailableSlots({ data: { shopId: id, barberId: apptBarber, date: apptDate } }),
+		enabled: !!apptBarber && !!apptDate,
 	});
 
 	const T = {

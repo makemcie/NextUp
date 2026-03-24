@@ -4,7 +4,7 @@ import { getRequest, setCookie, deleteCookie } from "@tanstack/react-start/serve
 import bcrypt from "bcryptjs";
 import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { broadcast, db } from "@/db";
-import { barbers, clients, sessions, shops, users, visits } from "@/db/schema";
+import { appointments, barbers, clients, sessions, shops, users, visits } from "@/db/schema";
 import { sendSMS } from "@/lib/messaging";
 
 async function getTwilioCreds() {
@@ -2025,4 +2025,278 @@ export const activateSubscription = createServerFn({ method: "POST" })
 		}).where(eq(shops.id, Number(shopId)));
 
 		return { success: true };
+	});
+
+// ============ APPOINTMENTS ============
+
+
+// Get available time slots for a barber on a specific date
+export const getAvailableSlots = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number; barberId: number; date: string }) => input)
+	.handler(async ({ data }) => {
+		// Get barber's working hours from shop
+		const shop = await (await db())
+			.select({ weeklyHours: shops.weeklyHours })
+			.from(shops)
+			.where(eq(shops.id, data.shopId))
+			.limit(1)
+			.all();
+
+		const weeklyHours = shop[0]?.weeklyHours ? JSON.parse(shop[0].weeklyHours) : {};
+		const dayOfWeek = new Date(data.date + "T12:00:00").getDay();
+		const dayHours = weeklyHours[dayOfWeek] ?? { open: "09:00", close: "18:00", closed: false };
+
+		if (dayHours.closed) return { slots: [] };
+
+		// Generate 30-min slots
+		const slots: string[] = [];
+		const [openH, openM] = dayHours.open.split(":").map(Number);
+		const [closeH, closeM] = dayHours.close.split(":").map(Number);
+		let current = openH * 60 + openM;
+		const end = closeH * 60 + closeM - 30; // Stop 30 min before close
+
+		while (current <= end) {
+			const h = Math.floor(current / 60).toString().padStart(2, "0");
+			const m = (current % 60).toString().padStart(2, "0");
+			slots.push(`${h}:${m}`);
+			current += 30;
+		}
+
+		// Remove already booked slots
+		const booked = await (await db())
+			.select({ appointmentTime: appointments.appointmentTime })
+			.from(appointments)
+			.where(
+				and(
+					eq(appointments.barberId, data.barberId),
+					eq(appointments.appointmentDate, data.date),
+					eq(appointments.status, "scheduled"),
+				)
+			)
+			.all();
+
+		const bookedTimes = new Set(booked.map(b => b.appointmentTime));
+		return { slots: slots.filter(s => !bookedTimes.has(s)) };
+	});
+
+// Create appointment
+export const createAppointment = createServerFn({ method: "POST" })
+	.inputValidator((input: {
+		shopId: number;
+		barberId: number;
+		clientName: string;
+		clientPhone: string;
+		date: string;
+		time: string;
+		notes?: string;
+	}) => input)
+	.handler(async ({ data }) => {
+		// Get or create client
+		const existingClient = await (await db())
+			.select()
+			.from(clients)
+			.where(and(eq(clients.shopId, data.shopId), eq(clients.phone, data.clientPhone)))
+			.limit(1)
+			.all();
+
+		let clientId: number | null = null;
+		if (existingClient[0]) {
+			clientId = existingClient[0].id;
+		} else {
+			const newClient = await (await db())
+				.insert(clients)
+				.values({ shopId: data.shopId, name: data.clientName, phone: data.clientPhone })
+				.returning({ id: clients.id })
+				.all();
+			clientId = newClient[0]?.id ?? null;
+		}
+
+		// Create appointment
+		const appt = await (await db())
+			.insert(appointments)
+			.values({
+				shopId: data.shopId,
+				barberId: data.barberId,
+				clientId,
+				clientName: data.clientName,
+				clientPhone: data.clientPhone,
+				appointmentDate: data.date,
+				appointmentTime: data.time,
+				notes: data.notes,
+			})
+			.returning()
+			.all();
+
+		// Get barber and shop info for SMS
+		const barberInfo = await (await db())
+			.select({ name: barbers.name, phone: barbers.specialty })
+			.from(barbers)
+			.where(eq(barbers.id, data.barberId))
+			.limit(1)
+			.all();
+
+		const shopInfo = await (await db())
+			.select({ name: shops.name })
+			.from(shops)
+			.where(eq(shops.id, data.shopId))
+			.limit(1)
+			.all();
+
+		// Send confirmation SMS
+		const creds = await getTwilioCreds();
+		if (creds.sid && data.clientPhone) {
+			const dateFormatted = new Date(data.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+			const timeFormatted = formatTime12(data.time);
+			sendSMS({
+				to: data.clientPhone,
+				body: `✅ Appointment confirmed at ${shopInfo[0]?.name}!\n${data.clientName} with ${barberInfo[0]?.name}\n📅 ${dateFormatted} at ${timeFormatted}\nReply STOP to opt out.`,
+				...creds,
+			}).catch(() => {});
+		}
+
+		return { success: true, appointmentId: appt[0]?.id };
+	});
+
+// Helper to format time
+function formatTime12(time: string): string {
+	const [h, m] = time.split(":").map(Number);
+	const ampm = h >= 12 ? "PM" : "AM";
+	const hour = h % 12 || 12;
+	return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
+}
+
+// Get appointments for a shop (dashboard)
+export const getShopAppointments = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number; date?: string }) => input)
+	.handler(async ({ data }) => {
+		const conditions = [eq(appointments.shopId, data.shopId)];
+		if (data.date) {
+			conditions.push(eq(appointments.appointmentDate, data.date));
+		}
+
+		const appts = await (await db())
+			.select({
+				id: appointments.id,
+				clientName: appointments.clientName,
+				clientPhone: appointments.clientPhone,
+				appointmentDate: appointments.appointmentDate,
+				appointmentTime: appointments.appointmentTime,
+				status: appointments.status,
+				notes: appointments.notes,
+				barberId: appointments.barberId,
+				barberName: barbers.name,
+			})
+			.from(appointments)
+			.leftJoin(barbers, eq(appointments.barberId, barbers.id))
+			.where(and(...conditions))
+			.orderBy(asc(appointments.appointmentDate), asc(appointments.appointmentTime))
+			.all();
+
+		return appts;
+	});
+
+// Get appointments for a barber
+export const getBarberAppointments = createServerFn({ method: "GET" })
+	.inputValidator((input: { date?: string }) => input)
+	.handler(async ({ data }) => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		const barber = await (await db())
+			.select()
+			.from(barbers)
+			.where(eq(barbers.userId, user.id))
+			.limit(1)
+			.all();
+
+		if (!barber[0]) return [];
+
+		const today = data.date ?? new Date().toISOString().split("T")[0];
+
+		return await (await db())
+			.select()
+			.from(appointments)
+			.where(
+				and(
+					eq(appointments.barberId, barber[0].id),
+					eq(appointments.appointmentDate, today),
+					eq(appointments.status, "scheduled"),
+				)
+			)
+			.orderBy(asc(appointments.appointmentTime))
+			.all();
+	});
+
+// Cancel appointment
+export const cancelAppointment = createServerFn({ method: "POST" })
+	.inputValidator((input: { appointmentId: number; shopId: number }) => input)
+	.handler(async ({ data }) => {
+		const appt = await (await db())
+			.select()
+			.from(appointments)
+			.where(eq(appointments.id, data.appointmentId))
+			.limit(1)
+			.all();
+
+		if (!appt[0]) throw new Error("Appointment not found");
+
+		await (await db())
+			.update(appointments)
+			.set({ status: "cancelled" })
+			.where(eq(appointments.id, data.appointmentId));
+
+		return { success: true };
+	});
+
+// Process appointment reminders (call every 30 min)
+export const processAppointmentReminders = createServerFn({ method: "POST" })
+	.handler(async () => {
+		const creds = await getTwilioCreds();
+		if (!creds.sid) return { sent: 0 };
+
+		const now = new Date();
+		const today = now.toISOString().split("T")[0];
+		const in2hours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+		const reminderTime = `${in2hours.getHours().toString().padStart(2, "0")}:${in2hours.getMinutes().toString().padStart(2, "0")}`;
+
+		const upcoming = await (await db())
+			.select({
+				id: appointments.id,
+				clientName: appointments.clientName,
+				clientPhone: appointments.clientPhone,
+				appointmentTime: appointments.appointmentTime,
+				barberName: barbers.name,
+				shopName: shops.name,
+			})
+			.from(appointments)
+			.leftJoin(barbers, eq(appointments.barberId, barbers.id))
+			.leftJoin(shops, eq(appointments.shopId, shops.id))
+			.where(
+				and(
+					eq(appointments.appointmentDate, today),
+					eq(appointments.appointmentTime, reminderTime),
+					eq(appointments.status, "scheduled"),
+					eq(appointments.reminderSent, false),
+				)
+			)
+			.all();
+
+		let sent = 0;
+		for (const appt of upcoming) {
+			if (appt.clientPhone) {
+				await sendSMS({
+					to: appt.clientPhone,
+					body: `⏰ Reminder: Your appointment at ${appt.shopName} with ${appt.barberName} is today at ${formatTime12(appt.appointmentTime)}. See you soon! 💈`,
+					...creds,
+				}).catch(() => {});
+
+				await (await db())
+					.update(appointments)
+					.set({ reminderSent: true })
+					.where(eq(appointments.id, appt.id));
+				sent++;
+			}
+		}
+
+		return { sent };
 	});

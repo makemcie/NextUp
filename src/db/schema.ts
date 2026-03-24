@@ -117,3 +117,22 @@ export const visits = sqliteTable("visits", {
 		.notNull()
 		.default(sql`(unixepoch())`),
 });
+
+// Appointments
+export const appointments = sqliteTable("appointments", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	shopId: integer("shop_id").notNull().references(() => shops.id),
+	barberId: integer("barber_id").notNull().references(() => barbers.id),
+	clientId: integer("client_id").references(() => clients.id),
+	clientName: text("client_name").notNull(),
+	clientPhone: text("client_phone").notNull(),
+	appointmentDate: text("appointment_date").notNull(), // YYYY-MM-DD
+	appointmentTime: text("appointment_time").notNull(), // HH:MM
+	status: text("status").notNull().default("scheduled"), // scheduled, completed, cancelled, no_show
+	notes: text("notes"),
+	visitId: integer("visit_id").references(() => visits.id),
+	reminderSent: integer("reminder_sent", { mode: "boolean" }).notNull().default(false),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+});
