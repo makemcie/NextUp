@@ -2483,7 +2483,8 @@ function ClientsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 
 
 // ============ PAYWALL SCREEN ============
-function PaywallScreen({ lang, onPaid }: { lang: Lang; onPaid: () => void }) {
+function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () => void }) {
+	const [lang, setLang] = useState<Lang>(initialLang);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 
@@ -2505,20 +2506,26 @@ function PaywallScreen({ lang, onPaid }: { lang: Lang; onPaid: () => void }) {
 	};
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-			<div className="max-w-md w-full bg-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-2xl p-8 shadow-2xl text-center">
-				<div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+		<div style={{ minHeight: "100dvh", width: "100%", background: "linear-gradient(135deg, #030305 0%, #0a0a0f 50%, #030305 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 16px", boxSizing: "border-box" }}>
+			{/* Language Toggle */}
+			<div style={{ position: "fixed", top: 16, right: 16, display: "flex", gap: 6, zIndex: 100 }}>
+				<button type="button" onClick={() => setLang("en")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", background: lang === "en" ? "#f97316" : "rgba(255,255,255,0.08)", color: lang === "en" ? "white" : "#64748b" }}>EN</button>
+				<button type="button" onClick={() => setLang("es")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", background: lang === "es" ? "#f97316" : "rgba(255,255,255,0.08)", color: lang === "es" ? "white" : "#64748b" }}>ES</button>
+			</div>
+
+			<div style={{ maxWidth: 440, width: "100%", background: "rgba(15,15,20,0.95)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 24, padding: "40px 32px", boxShadow: "0 25px 60px rgba(0,0,0,0.5)", textAlign: "center" }}>
+				<div style={{ width: 64, height: 64, background: "linear-gradient(135deg, #f97316, #ea580c)", borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
 					<Scissors className="w-8 h-8 text-white" />
 				</div>
-				<h1 className="text-2xl font-bold text-white mb-2">Goolinext Pro</h1>
-				<p className="text-gray-400 text-sm mb-8">
+				<h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "white", marginBottom: 8 }}>Goolinext Pro</h1>
+				<p style={{ color: "#64748b", fontSize: 14, marginBottom: 28, lineHeight: 1.6 }}>
 					{lang === "es"
 						? "Activa tu suscripción para acceder al sistema completo de gestión de tu barbería."
 						: "Activate your subscription to access the complete barbershop management system."}
 				</p>
 
 				{/* Features */}
-				<div className="space-y-3 mb-8 text-left">
+				<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24, textAlign: "left" }}>
 					{[
 						lang === "es" ? "✅ Cola virtual en tiempo real" : "✅ Real-time virtual queue",
 						lang === "es" ? "✅ SMS automáticos a clientes" : "✅ Automatic SMS to clients",
@@ -2527,29 +2534,29 @@ function PaywallScreen({ lang, onPaid }: { lang: Lang; onPaid: () => void }) {
 						lang === "es" ? "✅ Código QR descargable" : "✅ Downloadable QR code",
 						lang === "es" ? "✅ Soporte por WhatsApp" : "✅ WhatsApp support",
 					].map((feature, i) => (
-						<div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-gray-800/50 rounded-xl">
-							<span className="text-sm text-gray-300">{feature}</span>
+						<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12 }}>
+							<span style={{ fontSize: 13, color: "#cbd5e1" }}>{feature}</span>
 						</div>
 					))}
 				</div>
 
 				{/* Price */}
-				<div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
-					<p className="text-3xl font-bold text-white">$74<span className="text-lg text-gray-400">/mes</span></p>
-					<p className="text-amber-400 text-xs mt-1">{lang === "es" ? "Todo incluido · Sin contratos" : "All included · No contracts"}</p>
+				<div style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.25)", borderRadius: 16, padding: "16px", marginBottom: 20 }}>
+					<p style={{ fontSize: "2rem", fontWeight: 800, color: "white", margin: 0 }}>$74<span style={{ fontSize: "1rem", color: "#64748b", fontWeight: 400 }}>/mo</span></p>
+					<p style={{ color: "#f97316", fontSize: 12, marginTop: 4 }}>{lang === "es" ? "Todo incluido · Sin contratos" : "All included · No contracts"}</p>
 				</div>
 
-				{error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+				{error && <p style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
 				<button
 					type="button"
 					onClick={handleSubscribe}
 					disabled={loading}
-					className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 text-lg"
+					style={{ width: "100%", padding: "16px", background: loading ? "#92400e" : "linear-gradient(135deg, #f97316, #ea580c)", color: "white", fontWeight: 700, fontSize: 16, border: "none", borderRadius: 14, cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 8px 30px rgba(249,115,22,0.35)" }}
 				>
 					{loading ? "..." : (lang === "es" ? "🚀 Activar por $74/mes" : "🚀 Activate for $74/mo")}
 				</button>
-				<p className="text-gray-600 text-xs mt-4">
+				<p style={{ color: "#334155", fontSize: 11, marginTop: 12 }}>
 					{lang === "es" ? "Pago seguro vía Stripe · Cancela cuando quieras" : "Secure payment via Stripe · Cancel anytime"}
 				</p>
 			</div>
