@@ -856,6 +856,11 @@ function Dashboard({
 		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help"
 	>("dashboard");
 
+	const { data: subStatus, isLoading: subLoading } = useQuery({
+		queryKey: ["subscriptionStatus"],
+		queryFn: () => getSubscriptionStatus(),
+	});
+
 	// Poll for pending follow-ups every 2 minutes
 	useEffect(() => {
 		const run = () => {
@@ -2453,76 +2458,84 @@ function ClientsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 
 
 
-// ============ SUBSCRIPTION BANNER ============
-function SubscriptionBanner({ lang }: { lang: Lang }) {
-	const { data: sub } = useQuery({
-		queryKey: ["subscriptionStatus"],
-		queryFn: () => getSubscriptionStatus(),
-		refetchInterval: 60000,
-	});
+// ============ PAYWALL SCREEN ============
+function PaywallScreen({ lang, onPaid }: { lang: Lang; onPaid: () => void }) {
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState("");
 
-	const checkoutMutation = useMutation({
-		mutationFn: () => createCheckoutSession(),
-		onSuccess: (data) => {
-			if (data.url) window.location.href = data.url;
-		},
-	});
+	const handleSubscribe = async () => {
+		try {
+			setLoading(true);
+			setError("");
+			const result = await createCheckoutSession();
+			if (result?.url) {
+				window.location.href = result.url;
+			} else {
+				setError(lang === "es" ? "Error al crear sesión de pago" : "Error creating payment session");
+			}
+		} catch (e: any) {
+			setError(e.message ?? "Error");
+		} finally {
+			setLoading(false);
+		}
+	};
 
-	const cancelMutation = useMutation({
-		mutationFn: () => cancelSubscription(),
-		onSuccess: () => window.location.reload(),
-	});
-
-	if (sub?.status === "active") return null;
-
-	if (sub?.status === "canceled" || sub?.status === "past_due") {
-		return (
-			<div className="max-w-5xl mx-auto px-4 pt-2">
-				<div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center justify-between">
-					<div>
-						<p className="text-red-400 font-semibold text-sm">
-							{lang === "es" ? "⚠️ Tu suscripción ha expirado" : "⚠️ Your subscription has expired"}
-						</p>
-						<p className="text-red-300/70 text-xs mt-0.5">
-							{lang === "es" ? "Renueva para seguir usando Goolinext" : "Renew to keep using Goolinext"}
-						</p>
-					</div>
-					<button
-						type="button"
-						onClick={() => checkoutMutation.mutate()}
-						disabled={checkoutMutation.isPending}
-						className="px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-all"
-					>
-						{lang === "es" ? "Renovar" : "Renew"}
-					</button>
-				</div>
-			</div>
-		);
-	}
-
-	// Trial or no subscription
 	return (
-		<div className="max-w-5xl mx-auto px-4 pt-2">
-			<div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between gap-4">
-				<div>
-					<p className="text-amber-400 font-semibold text-sm">
-						{lang === "es" ? "🚀 Activa tu suscripción Goolinext Pro" : "🚀 Activate your Goolinext Pro subscription"}
-					</p>
-					<p className="text-amber-300/70 text-xs mt-0.5">
-						{lang === "es" ? "SMS incluidos · Soporte prioritario · $74/mes" : "SMS included · Priority support · $74/month"}
-					</p>
+		<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+			<div className="max-w-md w-full bg-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-2xl p-8 shadow-2xl text-center">
+				<div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+					<Scissors className="w-8 h-8 text-white" />
 				</div>
+				<h1 className="text-2xl font-bold text-white mb-2">Goolinext Pro</h1>
+				<p className="text-gray-400 text-sm mb-8">
+					{lang === "es"
+						? "Activa tu suscripción para acceder al sistema completo de gestión de tu barbería."
+						: "Activate your subscription to access the complete barbershop management system."}
+				</p>
+
+				{/* Features */}
+				<div className="space-y-3 mb-8 text-left">
+					{[
+						lang === "es" ? "✅ Cola virtual en tiempo real" : "✅ Real-time virtual queue",
+						lang === "es" ? "✅ SMS automáticos a clientes" : "✅ Automatic SMS to clients",
+						lang === "es" ? "✅ Página pública de tu negocio" : "✅ Public business page",
+						lang === "es" ? "✅ Barberos ilimitados" : "✅ Unlimited barbers",
+						lang === "es" ? "✅ Código QR descargable" : "✅ Downloadable QR code",
+						lang === "es" ? "✅ Soporte por WhatsApp" : "✅ WhatsApp support",
+					].map((feature, i) => (
+						<div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-gray-800/50 rounded-xl">
+							<span className="text-sm text-gray-300">{feature}</span>
+						</div>
+					))}
+				</div>
+
+				{/* Price */}
+				<div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
+					<p className="text-3xl font-bold text-white">$74<span className="text-lg text-gray-400">/mes</span></p>
+					<p className="text-amber-400 text-xs mt-1">{lang === "es" ? "Todo incluido · Sin contratos" : "All included · No contracts"}</p>
+				</div>
+
+				{error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+
 				<button
 					type="button"
-					onClick={() => checkoutMutation.mutate()}
-					disabled={checkoutMutation.isPending}
-					className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all"
+					onClick={handleSubscribe}
+					disabled={loading}
+					className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 text-lg"
 				>
-					{checkoutMutation.isPending ? "..." : (lang === "es" ? "Suscribirse $74/mes" : "Subscribe $74/mo")}
+					{loading ? "..." : (lang === "es" ? "🚀 Activar por $74/mes" : "🚀 Activate for $74/mo")}
 				</button>
+				<p className="text-gray-600 text-xs mt-4">
+					{lang === "es" ? "Pago seguro vía Stripe · Cancela cuando quieras" : "Secure payment via Stripe · Cancel anytime"}
+				</p>
 			</div>
 		</div>
 	);
+}
+
+// ============ SUBSCRIPTION BANNER ============
+function SubscriptionBanner({ lang }: { lang: Lang }) {
+	return null; // Banner replaced by paywall
 }
 
 // ============ HELP VIEW ============
