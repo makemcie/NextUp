@@ -2730,46 +2730,7 @@ function SettingsView({
 				</div>
 			</div>
 
-			{/* Twilio SMS */}
-			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
-				<h3 className="text-lg font-semibold text-white">{t.settSms}</h3>
-				<p className="text-sm text-gray-500">
-					{t.settSmsDesc}{" "}
-					<a
-						href="https://www.twilio.com"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="text-amber-400 underline"
-					>
-						twilio.com
-					</a>
-				</p>
-				<input
-					type="text"
-					value={twilioSid}
-					onChange={(e) => setTwilioSid(e.target.value)}
-					placeholder="Account SID"
-					className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-				/>
-				<input
-					type="password"
-					value={twilioToken}
-					onChange={(e) => setTwilioToken(e.target.value)}
-					placeholder="Auth Token"
-					className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-				/>
-				<input
-					type="text"
-					value={twilioPhone}
-					onChange={(e) => setTwilioPhone(e.target.value)}
-					placeholder={
-						lang === "es"
-							? "Número Twilio (+1XXXXXXXXXX)"
-							: "Twilio number (+1XXXXXXXXXX)"
-					}
-					className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-				/>
-			</div>
+
 
 			{/* SMS Consent (Opt-in) */}
 			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
