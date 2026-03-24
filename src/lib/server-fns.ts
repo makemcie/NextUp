@@ -1866,7 +1866,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 				"mode": "subscription",
 				"line_items[0][price]": "price_1TEK9I1NfybwCy3hbYZdnPwL",
 				"line_items[0][quantity]": "1",
-				"success_url": `${origin}/?payment=success`,
+				"success_url": `${origin}/?payment=success&shopId=${shop[0].id}&session_id={CHECKOUT_SESSION_ID}`,
 				"cancel_url": `${origin}/?payment=cancelled`,
 				"metadata[shopId]": String(shop[0].id),
 				"metadata[userId]": String(user.id),
@@ -1930,6 +1930,99 @@ export const cancelSubscription = createServerFn({ method: "POST" })
 			.update(shops)
 			.set({ subscriptionStatus: "canceled" })
 			.where(eq(shops.ownerId, user.id));
+
+		return { success: true };
+	});
+
+// ============ STRIPE WEBHOOK HANDLER ============
+export const handleStripeWebhook = createServerFn({ method: "POST" })
+	.inputValidator((input: { body: string; signature: string }) => input)
+	.handler(async ({ data }) => {
+		const mod = await import("cloudflare:workers");
+		const env = mod.env as Record<string, string>;
+		const webhookSecret = env.STRIPE_WEBHOOK_SECRET ?? "";
+
+		// Verify signature
+		const parts = data.signature.split(",");
+		const timestamp = parts.find((p: string) => p.startsWith("t="))?.split("=")[1] ?? "";
+		const sigHash = parts.find((p: string) => p.startsWith("v1="))?.split("=")[1] ?? "";
+		const signedPayload = `${timestamp}.${data.body}`;
+		const encoder = new TextEncoder();
+		const key = await crypto.subtle.importKey("raw", encoder.encode(webhookSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+		const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signedPayload));
+		const expectedSig = Array.from(new Uint8Array(sig)).map((b: number) => b.toString(16).padStart(2, "0")).join("");
+
+		if (expectedSig !== sigHash) throw new Error("Invalid signature");
+
+		const event = JSON.parse(data.body) as { type: string; data: { object: Record<string, unknown> } };
+
+		if (event.type === "checkout.session.completed") {
+			const session = event.data.object;
+			const shopId = (session.metadata as Record<string, string>)?.shopId;
+			const customerId = session.customer as string;
+			const subscriptionId = session.subscription as string;
+			if (shopId) {
+				const endsAt = new Date();
+				endsAt.setMonth(endsAt.getMonth() + 1);
+				await (await db()).update(shops).set({
+					stripeCustomerId: customerId,
+					stripeSubscriptionId: subscriptionId,
+					subscriptionStatus: "active",
+					subscriptionEndsAt: endsAt,
+				}).where(eq(shops.id, Number(shopId)));
+			}
+		}
+
+		if (event.type === "customer.subscription.deleted") {
+			const sub = event.data.object;
+			await (await db()).update(shops).set({ subscriptionStatus: "canceled" })
+				.where(eq(shops.stripeSubscriptionId, sub.id as string));
+		}
+
+		if (event.type === "invoice.payment_failed") {
+			const inv = event.data.object;
+			await (await db()).update(shops).set({ subscriptionStatus: "past_due" })
+				.where(eq(shops.stripeSubscriptionId, inv.subscription as string));
+		}
+
+		return { received: true };
+	});
+
+// Activate subscription after successful Stripe checkout
+export const activateSubscription = createServerFn({ method: "POST" })
+	.inputValidator((input: { sessionId: string }) => input)
+	.handler(async ({ data }) => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		const stripeKey = await getStripeKey();
+
+		// Get checkout session from Stripe
+		const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${data.sessionId}`, {
+			headers: { Authorization: `Bearer ${stripeKey}` },
+		});
+
+		const session = await response.json() as {
+			payment_status: string;
+			customer: string;
+			subscription: string;
+			metadata: { shopId?: string };
+		};
+
+		if (session.payment_status !== "paid") throw new Error("Payment not completed");
+
+		const shopId = session.metadata?.shopId;
+		if (!shopId) throw new Error("Shop not found");
+
+		const endsAt = new Date();
+		endsAt.setMonth(endsAt.getMonth() + 1);
+
+		await (await db()).update(shops).set({
+			stripeCustomerId: session.customer,
+			stripeSubscriptionId: session.subscription,
+			subscriptionStatus: "active",
+			subscriptionEndsAt: endsAt,
+		}).where(eq(shops.id, Number(shopId)));
 
 		return { success: true };
 	});

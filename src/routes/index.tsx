@@ -77,6 +77,7 @@ import {
 	createCheckoutSession,
 	getSubscriptionStatus,
 	cancelSubscription,
+	activateSubscription,
 } from "@/lib/server-fns";
 import { useWebSocket } from "@/lib/websocket";
 
@@ -856,10 +857,28 @@ function Dashboard({
 		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help"
 	>("dashboard");
 
-	const { data: subStatus, isLoading: subLoading } = useQuery({
+	const { data: subStatus, isLoading: subLoading, refetch: refetchSub } = useQuery({
 		queryKey: ["subscriptionStatus"],
 		queryFn: () => getSubscriptionStatus(),
 	});
+
+	// Handle payment success redirect from Stripe
+	useEffect(() => {
+		const params = new URLSearchParams(window.location.search);
+		const payment = params.get("payment");
+		const sessionId = params.get("session_id");
+		if (payment === "success" && sessionId) {
+			activateSubscription({ data: { sessionId } })
+				.then(() => {
+					window.history.replaceState({}, "", "/");
+					refetchSub();
+				})
+				.catch(() => {
+					window.history.replaceState({}, "", "/");
+					refetchSub();
+				});
+		}
+	}, []);
 
 	// Poll for pending follow-ups every 2 minutes
 	useEffect(() => {
