@@ -274,7 +274,10 @@ function RegisterPage() {
 									</div>
 								</div>
 								<span className="text-xs text-gray-400 leading-relaxed">
-									{consentText}
+									{consentText}{" "}
+									<a href="https://goolinext.com/privacy" target="_blank" rel="noopener noreferrer" style={{color:"#f97316"}}>Privacy Policy</a>
+									{" & "}
+									<a href="https://goolinext.com/terms" target="_blank" rel="noopener noreferrer" style={{color:"#f97316"}}>Terms</a>.
 								</span>
 							</label>
 						</div>
