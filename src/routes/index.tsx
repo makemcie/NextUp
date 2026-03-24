@@ -891,6 +891,11 @@ function Dashboard({
 		{ key: "help" as const, label: lang === "es" ? "Ayuda" : "Help", icon: Bell },
 	];
 
+	// Show paywall if not subscribed
+	if (!subLoading && subStatus?.status !== "active") {
+		return <PaywallScreen lang={lang} onPaid={() => window.location.reload()} />;
+	}
+
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
 			{/* Header */}
