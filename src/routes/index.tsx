@@ -907,6 +907,8 @@ function Dashboard({
 				</div>
 			</div>
 
+			{/* Subscription Banner */}
+			<SubscriptionBanner lang={lang} />
 			{/* Nav Tabs */}
 			<div className="max-w-5xl mx-auto px-4 py-3">
 				<div className="flex gap-1 bg-gray-900/60 p-1 rounded-xl overflow-x-auto">
