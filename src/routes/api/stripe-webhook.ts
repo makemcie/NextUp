@@ -1,4 +1,7 @@
 import { createAPIFileRoute } from "@tanstack/react-start/api";
+import { drizzle } from "drizzle-orm/d1";
+import { eq } from "drizzle-orm";
+import { shops } from "../../db/schema";
 
 export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
 	POST: async ({ request }) => {
@@ -6,24 +9,17 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
 			const body = await request.text();
 			const signature = request.headers.get("stripe-signature") ?? "";
 
-			const mod = await import("cloudflare:workers");
-			const env = mod.env as Record<string, string>;
+			// @ts-ignore
+			const env = process.env as Record<string, string>;
 			const webhookSecret = env.STRIPE_WEBHOOK_SECRET ?? "";
 
-			// Verify webhook signature
+			// Verify signature
 			const parts = signature.split(",");
 			const timestamp = parts.find((p: string) => p.startsWith("t="))?.split("=")[1] ?? "";
 			const sigHash = parts.find((p: string) => p.startsWith("v1="))?.split("=")[1] ?? "";
-
 			const signedPayload = `${timestamp}.${body}`;
 			const encoder = new TextEncoder();
-			const key = await crypto.subtle.importKey(
-				"raw",
-				encoder.encode(webhookSecret),
-				{ name: "HMAC", hash: "SHA-256" },
-				false,
-				["sign"]
-			);
+			const key = await crypto.subtle.importKey("raw", encoder.encode(webhookSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 			const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signedPayload));
 			const expectedSig = Array.from(new Uint8Array(sig)).map((b: number) => b.toString(16).padStart(2, "0")).join("");
 
@@ -32,9 +28,7 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
 			}
 
 			const event = JSON.parse(body) as { type: string; data: { object: Record<string, unknown> } };
-			const { drizzle } = await import("drizzle-orm/d1");
-			const { shops } = await import("../../db/schema");
-			const { eq } = await import("drizzle-orm");
+			// @ts-ignore
 			const db = drizzle(env.DB as D1Database);
 
 			if (event.type === "checkout.session.completed") {
@@ -67,8 +61,9 @@ export const APIRoute = createAPIFileRoute("/api/stripe-webhook")({
 			}
 
 			return new Response("OK", { status: 200 });
-		} catch {
-			return new Response("Error", { status: 500 });
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : "Error";
+			return new Response(msg, { status: 500 });
 		}
 	},
 });
