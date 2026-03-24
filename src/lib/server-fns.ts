@@ -1829,3 +1829,107 @@ export const sendSupportEmail = createServerFn({ method: "POST" })
 
 		return { success: true };
 	});
+
+// ============ STRIPE PAYMENTS ============
+
+async function getStripeKey() {
+	const mod = await import("cloudflare:workers");
+	const env = mod.env as Record<string, string>;
+	return env.STRIPE_SECRET_KEY ?? "";
+}
+
+// Create Stripe checkout session
+export const createCheckoutSession = createServerFn({ method: "POST" })
+	.handler(async () => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		const shop = await (await db())
+			.select()
+			.from(shops)
+			.where(eq(shops.ownerId, user.id))
+			.limit(1)
+			.all();
+
+		if (!shop[0]) throw new Error("Shop not found");
+
+		const stripeKey = await getStripeKey();
+		const origin = "https://goolinext.com";
+
+		const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${stripeKey}`,
+				"Content-Type": "application/x-www-form-urlencoded",
+			},
+			body: new URLSearchParams({
+				"mode": "subscription",
+				"line_items[0][price]": "price_1TEK9I1NfybwCy3hbYZdnPwL",
+				"line_items[0][quantity]": "1",
+				"success_url": `${origin}/?payment=success`,
+				"cancel_url": `${origin}/?payment=cancelled`,
+				"metadata[shopId]": String(shop[0].id),
+				"metadata[userId]": String(user.id),
+				"customer_email": user.email,
+			}),
+		});
+
+		const session = await response.json() as { url?: string; error?: { message: string } };
+
+		if (!response.ok) throw new Error(session.error?.message ?? "Stripe error");
+
+		return { url: session.url };
+	});
+
+// Get subscription status
+export const getSubscriptionStatus = createServerFn({ method: "GET" })
+	.handler(async () => {
+		const user = await getSessionUser();
+		if (!user) return { status: "none" };
+
+		const shop = await (await db())
+			.select({
+				subscriptionStatus: shops.subscriptionStatus,
+				subscriptionEndsAt: shops.subscriptionEndsAt,
+				stripeSubscriptionId: shops.stripeSubscriptionId,
+			})
+			.from(shops)
+			.where(eq(shops.ownerId, user.id))
+			.limit(1)
+			.all();
+
+		return {
+			status: shop[0]?.subscriptionStatus ?? "trial",
+			endsAt: shop[0]?.subscriptionEndsAt ?? null,
+		};
+	});
+
+// Cancel subscription
+export const cancelSubscription = createServerFn({ method: "POST" })
+	.handler(async () => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		const shop = await (await db())
+			.select({ stripeSubscriptionId: shops.stripeSubscriptionId })
+			.from(shops)
+			.where(eq(shops.ownerId, user.id))
+			.limit(1)
+			.all();
+
+		if (!shop[0]?.stripeSubscriptionId) throw new Error("No subscription found");
+
+		const stripeKey = await getStripeKey();
+
+		await fetch(`https://api.stripe.com/v1/subscriptions/${shop[0].stripeSubscriptionId}`, {
+			method: "DELETE",
+			headers: { Authorization: `Bearer ${stripeKey}` },
+		});
+
+		await (await db())
+			.update(shops)
+			.set({ subscriptionStatus: "canceled" })
+			.where(eq(shops.ownerId, user.id));
+
+		return { success: true };
+	});

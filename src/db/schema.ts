@@ -60,6 +60,10 @@ export const shops = sqliteTable("shops", {
 	followUpDelayMinutes: integer("follow_up_delay_minutes").notNull().default(180),
 	logoUrl: text("logo_url"),
 	weeklyHours: text("weekly_hours"),
+	stripeCustomerId: text("stripe_customer_id"),
+	stripeSubscriptionId: text("stripe_subscription_id"),
+	subscriptionStatus: text("subscription_status").default("trial"), // trial, active, past_due, canceled
+	subscriptionEndsAt: integer("subscription_ends_at", { mode: "timestamp" }),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),

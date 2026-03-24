@@ -74,6 +74,9 @@ import {
 	updateMyBarberPhoto,
 	updateShop,
 	sendSupportEmail,
+	createCheckoutSession,
+	getSubscriptionStatus,
+	cancelSubscription,
 } from "@/lib/server-fns";
 import { useWebSocket } from "@/lib/websocket";
 
@@ -2446,6 +2449,79 @@ function ClientsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 	);
 }
 
+
+
+// ============ SUBSCRIPTION BANNER ============
+function SubscriptionBanner({ lang }: { lang: Lang }) {
+	const { data: sub } = useQuery({
+		queryKey: ["subscriptionStatus"],
+		queryFn: () => getSubscriptionStatus(),
+		refetchInterval: 60000,
+	});
+
+	const checkoutMutation = useMutation({
+		mutationFn: () => createCheckoutSession(),
+		onSuccess: (data) => {
+			if (data.url) window.location.href = data.url;
+		},
+	});
+
+	const cancelMutation = useMutation({
+		mutationFn: () => cancelSubscription(),
+		onSuccess: () => window.location.reload(),
+	});
+
+	if (sub?.status === "active") return null;
+
+	if (sub?.status === "canceled" || sub?.status === "past_due") {
+		return (
+			<div className="max-w-5xl mx-auto px-4 pt-2">
+				<div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center justify-between">
+					<div>
+						<p className="text-red-400 font-semibold text-sm">
+							{lang === "es" ? "⚠️ Tu suscripción ha expirado" : "⚠️ Your subscription has expired"}
+						</p>
+						<p className="text-red-300/70 text-xs mt-0.5">
+							{lang === "es" ? "Renueva para seguir usando Goolinext" : "Renew to keep using Goolinext"}
+						</p>
+					</div>
+					<button
+						type="button"
+						onClick={() => checkoutMutation.mutate()}
+						disabled={checkoutMutation.isPending}
+						className="px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-all"
+					>
+						{lang === "es" ? "Renovar" : "Renew"}
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	// Trial or no subscription
+	return (
+		<div className="max-w-5xl mx-auto px-4 pt-2">
+			<div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between gap-4">
+				<div>
+					<p className="text-amber-400 font-semibold text-sm">
+						{lang === "es" ? "🚀 Activa tu suscripción Goolinext Pro" : "🚀 Activate your Goolinext Pro subscription"}
+					</p>
+					<p className="text-amber-300/70 text-xs mt-0.5">
+						{lang === "es" ? "SMS incluidos · Soporte prioritario · $74/mes" : "SMS included · Priority support · $74/month"}
+					</p>
+				</div>
+				<button
+					type="button"
+					onClick={() => checkoutMutation.mutate()}
+					disabled={checkoutMutation.isPending}
+					className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all"
+				>
+					{checkoutMutation.isPending ? "..." : (lang === "es" ? "Suscribirse $74/mes" : "Subscribe $74/mo")}
+				</button>
+			</div>
+		</div>
+	);
+}
 
 // ============ HELP VIEW ============
 
