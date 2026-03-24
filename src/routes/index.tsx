@@ -815,7 +815,7 @@ function LogoutButton({ lang }: { lang: Lang }) {
 		mutationFn: () => logout(),
 		onSuccess: () => {
 			queryClient.clear();
-			queryClient.invalidateQueries({ queryKey: ["checkAuth"] });
+			window.location.href = "/";
 		},
 	});
 
@@ -891,8 +891,8 @@ function Dashboard({
 		{ key: "help" as const, label: lang === "es" ? "Ayuda" : "Help", icon: Bell },
 	];
 
-	// Show paywall if not subscribed
-	if (!subLoading && subStatus?.status !== "active") {
+	// Show paywall if not subscribed (only when we have definitive data)
+	if (!subLoading && subStatus !== undefined && subStatus?.status !== "active") {
 		return <PaywallScreen lang={lang} onPaid={() => window.location.reload()} />;
 	}
 
