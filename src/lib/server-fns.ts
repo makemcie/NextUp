@@ -916,7 +916,13 @@ export const deleteClient = createServerFn({ method: "POST" })
 			.all();
 		if (shop.length === 0) throw new Error("Not authorized");
 
-		// Delete associated visits first
+		// Delete associated appointments first
+		await (await db())
+			.delete(appointments)
+			.where(
+				and(eq(appointments.clientId, data.clientId), eq(appointments.shopId, data.shopId)),
+			);
+		// Delete associated visits
 		await (await db())
 			.delete(visits)
 			.where(
