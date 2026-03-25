@@ -282,28 +282,16 @@ function AuthScreen({
 					</div>
 
 					{resetToken && !resetDone ? (
-						// User came from email link - show new password form directly
 						<div className="space-y-4">
 							<p className="text-gray-400 text-sm text-center">{lang === "es" ? "Ingresa tu nueva contraseña" : "Enter your new password"}</p>
-							<div>
-								<label htmlFor="new-password" className="block text-sm font-medium text-gray-300 mb-1">
-									<span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" />{t.newPassword}</span>
-								</label>
-								<input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t.newPasswordPlaceholder} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" onKeyDown={(e) => { if (e.key === "Enter") handleReset(); }} />
-							</div>
-							<div>
-								<label htmlFor="confirm-new-password" className="block text-sm font-medium text-gray-300 mb-1">
-									<span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" />{t.confirmNewPassword}</span>
-								</label>
-								<input id="confirm-new-password" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder={t.confirmNewPasswordPlaceholder} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" onKeyDown={(e) => { if (e.key === "Enter") handleReset(); }} />
-							</div>
+							<input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t.newPasswordPlaceholder} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" onKeyDown={(e) => { if (e.key === "Enter") handleReset(); }} />
+							<input id="confirm-new-password" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder={t.confirmNewPasswordPlaceholder} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" onKeyDown={(e) => { if (e.key === "Enter") handleReset(); }} />
 							{error && <p className="text-red-400 text-sm text-center">{error}</p>}
 							<button type="button" onClick={handleReset} disabled={resetMutation.isPending} className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50">
 								{resetMutation.isPending ? t.resetting : t.resetPassword}
 							</button>
 						</div>
 					) : recoverySent ? (
-						// Email sent confirmation
 						<div className="space-y-4 text-center">
 							<div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
 								<Mail className="w-6 h-6 text-green-400" />
@@ -325,7 +313,6 @@ function AuthScreen({
 							</button>
 						</div>
 					) : (
-						// Email input form
 						<div className="space-y-4">
 							<p className="text-gray-400 text-sm text-center">
 								{lang === "es" ? "Ingresa tu correo y te enviaremos un link para restablecer tu contraseña" : "Enter your email and we will send you a link to reset your password"}
@@ -340,49 +327,11 @@ function AuthScreen({
 							</button>
 						</div>
 					)}
-
-								<button
-									type="button"
-									onClick={handleReset}
-									disabled={resetMutation.isPending}
-									className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-								>
-									{resetMutation.isPending ? t.resetting : t.resetPassword}
-								</button>
-
-								<button
-									type="button"
-									onClick={() => {
-										setMode("login");
-										setError("");
-									}}
-									className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-gray-300 text-sm"
-								>
-									<ArrowLeft className="w-4 h-4" />
-									{t.backToLogin}
-								</button>
-							</div>
-						)
-					) : (
-						<div className="space-y-4 text-center">
-							<p className="text-gray-400 text-sm">{t.noAccountFound}</p>
-							<button
-								type="button"
-								onClick={() => {
-									setMode("login");
-									setError("");
-								}}
-								className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-gray-300 text-sm"
-							>
-								<ArrowLeft className="w-4 h-4" />
-								{t.backToLogin}
-							</button>
-						</div>
-					)}
 				</div>
 			</div>
 		);
 	}
+
 
 	// ---- Signup / Login mode ----
 	return (
