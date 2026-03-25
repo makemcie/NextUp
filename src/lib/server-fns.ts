@@ -2300,3 +2300,147 @@ export const processAppointmentReminders = createServerFn({ method: "POST" })
 
 		return { sent };
 	});
+
+// Request appointment cancellation (barber)
+export const requestCancelAppointment = createServerFn({ method: "POST" })
+	.inputValidator((input: { appointmentId: number }) => input)
+	.handler(async ({ data }) => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		// Get appointment with barber and shop info
+		const appt = await (await db())
+			.select({
+				id: appointments.id,
+				clientName: appointments.clientName,
+				appointmentDate: appointments.appointmentDate,
+				appointmentTime: appointments.appointmentTime,
+				shopId: appointments.shopId,
+				barberId: appointments.barberId,
+				barberName: barbers.name,
+			})
+			.from(appointments)
+			.leftJoin(barbers, eq(appointments.barberId, barbers.id))
+			.where(eq(appointments.id, data.appointmentId))
+			.limit(1)
+			.all();
+
+		if (!appt[0]) throw new Error("Appointment not found");
+
+		// Mark as cancel requested
+		await (await db())
+			.update(appointments)
+			.set({ cancelRequested: true, cancelRequestedBy: user.id })
+			.where(eq(appointments.id, data.appointmentId));
+
+		// Get owner phone
+		const shop = await (await db())
+			.select({ ownerId: shops.ownerId, name: shops.name })
+			.from(shops)
+			.where(eq(shops.id, appt[0].shopId))
+			.limit(1)
+			.all();
+
+		const owner = await (await db())
+			.select({ phone: users.phone })
+			.from(users)
+			.where(eq(users.id, shop[0].ownerId))
+			.limit(1)
+			.all();
+
+		// SMS to owner
+		const creds = await getTwilioCreds();
+		if (creds.sid && owner[0]?.phone) {
+			const dateFormatted = new Date(appt[0].appointmentDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+			await sendSMS({
+				to: owner[0].phone,
+				body: `⚠️ ${appt[0].barberName} has requested to cancel the appointment with ${appt[0].clientName} on ${dateFormatted} at ${appt[0].appointmentTime}. Please review in your dashboard.`,
+				...creds,
+			}).catch(() => {});
+		}
+
+		return { success: true };
+	});
+
+// Confirm cancellation (owner)
+export const confirmCancelAppointment = createServerFn({ method: "POST" })
+	.inputValidator((input: { appointmentId: number; shopId: number }) => input)
+	.handler(async ({ data }) => {
+		const appt = await (await db())
+			.select()
+			.from(appointments)
+			.where(eq(appointments.id, data.appointmentId))
+			.limit(1)
+			.all();
+
+		if (!appt[0]) throw new Error("Appointment not found");
+
+		// Cancel the appointment
+		await (await db())
+			.update(appointments)
+			.set({ status: "cancelled" })
+			.where(eq(appointments.id, data.appointmentId));
+
+		// SMS to client
+		const creds = await getTwilioCreds();
+		const shopInfo = await (await db())
+			.select({ name: shops.name })
+			.from(shops)
+			.where(eq(shops.id, data.shopId))
+			.limit(1)
+			.all();
+
+		if (creds.sid && appt[0].clientPhone) {
+			await sendSMS({
+				to: appt[0].clientPhone,
+				body: `We're sorry, your appointment at ${shopInfo[0]?.name} on ${appt[0].appointmentDate} at ${appt[0].appointmentTime} has been cancelled. Please contact us to reschedule.`,
+				...creds,
+			}).catch(() => {});
+		}
+
+		return { success: true };
+	});
+
+// Update barber phone
+export const updateBarberPhone = createServerFn({ method: "POST" })
+	.inputValidator((input: { barberId: number; shopId: number; phone: string }) => input)
+	.handler(async ({ data }) => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		await (await db())
+			.update(barbers)
+			.set({ phone: data.phone })
+			.where(and(eq(barbers.id, data.barberId), eq(barbers.shopId, data.shopId)));
+
+		return { success: true };
+	});
+
+// Update owner phone
+export const updateOwnerPhone = createServerFn({ method: "POST" })
+	.inputValidator((input: { phone: string }) => input)
+	.handler(async ({ data }) => {
+		const user = await getSessionUser();
+		if (!user) throw new Error("Not authenticated");
+
+		await (await db())
+			.update(users)
+			.set({ phone: data.phone })
+			.where(eq(users.id, user.id));
+
+		return { success: true };
+	});
+
+// Get owner phone
+export const getOwnerPhone = createServerFn({ method: "GET" })
+	.handler(async () => {
+		const user = await getSessionUser();
+		if (!user) return { phone: "" };
+		const u = await (await db())
+			.select({ phone: users.phone })
+			.from(users)
+			.where(eq(users.id, user.id))
+			.limit(1)
+			.all();
+		return { phone: u[0]?.phone ?? "" };
+	});

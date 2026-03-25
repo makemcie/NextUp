@@ -83,6 +83,12 @@ import {
 	getAvailableSlots,
 	createAppointment,
 	processAppointmentReminders,
+	requestCancelAppointment,
+	confirmCancelAppointment,
+	updateOwnerPhone,
+	getOwnerPhone,
+	getBarberAppointments,
+	updateBarberPhone,
 } from "@/lib/server-fns";
 import { useWebSocket } from "@/lib/websocket";
 
@@ -1018,6 +1024,18 @@ function BarberPortal({
 		refetchInterval: 10000,
 	});
 
+	const today = new Date().toISOString().split("T")[0];
+	const { data: myAppointments } = useQuery({
+		queryKey: ["barberAppointments", today],
+		queryFn: () => getBarberAppointments({ data: { date: today } }),
+		refetchInterval: 60000,
+	});
+
+	const requestCancelMutation = useMutation({
+		mutationFn: (appointmentId: number) => requestCancelAppointment({ data: { appointmentId } }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["barberAppointments"] }),
+	});
+
 	// Real-time updates
 	useWebSocket({
 		onMessage: (msg) => {
@@ -1706,6 +1724,16 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 			}),
 		onSuccess: () =>
 			queryClient.invalidateQueries({ queryKey: ["barbers", shopId] }),
+	});
+
+	const [editingPhone, setEditingPhone] = useState<{ id: number; phone: string } | null>(null);
+	const phoneMutation = useMutation({
+		mutationFn: (args: { barberId: number; phone: string }) =>
+			updateBarberPhone({ data: { barberId: args.barberId, shopId, phone: args.phone } }),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["barbers", shopId] });
+			setEditingPhone(null);
+		},
 	});
 
 	const copyCode = (barberId: number, code: string) => {
@@ -2613,7 +2641,7 @@ function AppointmentsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 	});
 
 	const cancelMutation = useMutation({
-		mutationFn: (appointmentId: number) => cancelAppointment({ data: { appointmentId, shopId } }),
+		mutationFn: (appointmentId: number) => confirmCancelAppointment({ data: { appointmentId, shopId } }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopAppointments", shopId] }),
 	});
 
@@ -2886,6 +2914,21 @@ function SettingsView({
 		fullShop?.reminderDays ?? 30,
 	);
 	const [logoUrl, setLogoUrl] = useState(fullShop?.logoUrl ?? "");
+	const [ownerPhone, setOwnerPhone] = useState("");
+
+	// Load owner phone
+	const { data: ownerPhoneData } = useQuery({
+		queryKey: ["ownerPhone"],
+		queryFn: () => getOwnerPhone(),
+	});
+
+	useEffect(() => {
+		if (ownerPhoneData?.phone) setOwnerPhone(ownerPhoneData.phone);
+	}, [ownerPhoneData]);
+
+	const savePhoneMutation = useMutation({
+		mutationFn: () => updateOwnerPhone({ data: { phone: ownerPhone } }),
+	});
 	const defaultHours = {
 		0: { open: "09:00", close: "18:00", closed: true },
 		1: { open: "09:00", close: "19:00", closed: false },

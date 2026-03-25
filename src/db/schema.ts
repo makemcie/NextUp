@@ -77,6 +77,7 @@ export const barbers = sqliteTable("barbers", {
 	specialty: text("specialty"),
 	photoUrl: text("photo_url"),
 	isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+	phone: text("phone"),
 	userId: integer("user_id").references(() => users.id),
 	accessCode: text("access_code"),
 	workDays: text("work_days").notNull().default("[0,1,2,3,4,5,6]"),
@@ -132,6 +133,8 @@ export const appointments = sqliteTable("appointments", {
 	notes: text("notes"),
 	visitId: integer("visit_id").references(() => visits.id),
 	reminderSent: integer("reminder_sent", { mode: "boolean" }).notNull().default(false),
+	cancelRequested: integer("cancel_requested", { mode: "boolean" }).notNull().default(false),
+	cancelRequestedBy: integer("cancel_requested_by"),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
