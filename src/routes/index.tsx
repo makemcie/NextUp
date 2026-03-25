@@ -2691,6 +2691,14 @@ function AppointmentsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 		refetchInterval: 30000,
 	});
 
+	// Get all pending cancellations regardless of date
+	const { data: allAppts } = useQuery({
+		queryKey: ["allShopAppointments", shopId],
+		queryFn: () => getShopAppointments({ data: { shopId } }),
+		refetchInterval: 30000,
+	});
+	const pendingCancelAppts = (allAppts ?? []).filter((a: any) => a.cancelRequested);
+
 	const { data: slots } = useQuery({
 		queryKey: ["availableSlots", newAppt.barberId, newAppt.date],
 		queryFn: () => getAvailableSlots({ data: { shopId, barberId: newAppt.barberId, date: newAppt.date } }),
@@ -2726,6 +2734,26 @@ function AppointmentsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 					{lang === "es" ? "Nueva cita" : "New appointment"}
 				</button>
 			</div>
+
+			{/* Pending cancellations alert */}
+			{pendingCancelAppts.length > 0 && (
+				<div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+					<p className="text-red-400 font-semibold text-sm mb-3">⚠️ {lang === "es" ? `${pendingCancelAppts.length} solicitud(es) de cancelación pendiente(s)` : `${pendingCancelAppts.length} pending cancellation request(s)`}</p>
+					<div className="space-y-2">
+						{pendingCancelAppts.map(appt => (
+							<div key={appt.id} className="flex items-center justify-between bg-gray-900/60 rounded-xl px-4 py-3">
+								<div>
+									<p className="text-white font-medium text-sm">{appt.clientName}</p>
+									<p className="text-gray-500 text-xs">{appt.appointmentDate} · {fmt12(appt.appointmentTime)} · {appt.barberName}</p>
+								</div>
+								<button type="button" onClick={() => cancelMutation.mutate(appt.id)} disabled={cancelMutation.isPending} className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-colors flex-shrink-0">
+									{lang === "es" ? "Confirmar cancelación" : "Confirm cancel"}
+								</button>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
 
 			{/* Date selector */}
 			<div className="flex items-center gap-3">
