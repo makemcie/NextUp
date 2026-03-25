@@ -56,7 +56,6 @@ import {
 	getMyRole,
 	getMyShop,
 	getRecoveryInfo,
-	sendRecoveryEmail,
 	getShopClients,
 	getShopQueues,
 	login,
@@ -150,17 +149,39 @@ function AuthScreen({
 	const [resetDone, setResetDone] = useState(false);
 
 	const [recoveryEmail, setRecoveryEmail] = useState("");
-	const [recoverySearched, setRecoverySearched] = useState(false);
-	const recoveryQuery = useQuery({
-		queryKey: ["recoveryInfo", recoveryEmail],
-		queryFn: () => getRecoveryInfo({ data: { email: recoveryEmail } }),
-		enabled: mode === "recovery" && recoverySearched && !!recoveryEmail,
-		onSuccess: (data) => {
-			if (data?.found) {
-				sendRecoveryEmail({ data: { email: recoveryEmail } }).catch(() => {});
+	const [recoverySent, setRecoverySent] = useState(false);
+	const [recoveryLoading, setRecoveryLoading] = useState(false);
+	const [recoveryNotFound, setRecoveryNotFound] = useState(false);
+	const [resetToken, setResetToken] = useState("");
+
+	// Check for reset token in URL
+	useEffect(() => {
+		if (typeof window !== "undefined") {
+			const params = new URLSearchParams(window.location.search);
+			const token = params.get("reset");
+			if (token) {
+				setResetToken(token);
+				setMode("recovery");
+				window.history.replaceState({}, "", "/");
 			}
-		},
-	});
+		}
+	}, []);
+
+	const handleSendRecovery = async () => {
+		if (!recoveryEmail.includes("@")) return;
+		setRecoveryLoading(true);
+		setRecoveryNotFound(false);
+		try {
+			const result = await getRecoveryInfo({ data: { email: recoveryEmail } });
+			if (result?.found) {
+				setRecoverySent(true);
+			} else {
+				setRecoveryNotFound(true);
+			}
+		} catch {} finally {
+			setRecoveryLoading(false);
+		}
+	};
 
 	const signupMutation = useMutation({
 		mutationFn: () => signup({ data: { email, password } }),
@@ -193,7 +214,7 @@ function AuthScreen({
 	});
 
 	const resetMutation = useMutation({
-		mutationFn: () => resetPassword({ data: { email: recoveryEmail, newPassword } }),
+		mutationFn: () => resetPassword({ data: { token: resetToken, newPassword } }),
 		onSuccess: (result) => {
 			if (!result.success) {
 				setError(t.passwordTooShort);
@@ -260,113 +281,65 @@ function AuthScreen({
 						<h1 className="text-2xl font-bold text-white">{t.recoveryTitle}</h1>
 					</div>
 
-					{!recoverySearched ? (
+					{resetToken && !resetDone ? (
+						// User came from email link - show new password form directly
 						<div className="space-y-4">
-							<p className="text-gray-400 text-sm text-center">
-								{lang === "es" ? "Ingresa tu correo para restablecer tu contraseña" : "Enter your email to reset your password"}
-							</p>
-							<input
-								type="email"
-								value={recoveryEmail}
-								onChange={(e) => setRecoveryEmail(e.target.value)}
-								placeholder={t.emailPlaceholder}
-								className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-								onKeyDown={(e) => { if (e.key === "Enter" && recoveryEmail.includes("@")) setRecoverySearched(true); }}
-							/>
-							<button
-								type="button"
-								onClick={() => setRecoverySearched(true)}
-								disabled={!recoveryEmail.includes("@")}
-								className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition-all"
-							>
-								{lang === "es" ? "Buscar cuenta" : "Find account"}
+							<p className="text-gray-400 text-sm text-center">{lang === "es" ? "Ingresa tu nueva contraseña" : "Enter your new password"}</p>
+							<div>
+								<label htmlFor="new-password" className="block text-sm font-medium text-gray-300 mb-1">
+									<span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" />{t.newPassword}</span>
+								</label>
+								<input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t.newPasswordPlaceholder} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" onKeyDown={(e) => { if (e.key === "Enter") handleReset(); }} />
+							</div>
+							<div>
+								<label htmlFor="confirm-new-password" className="block text-sm font-medium text-gray-300 mb-1">
+									<span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" />{t.confirmNewPassword}</span>
+								</label>
+								<input id="confirm-new-password" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder={t.confirmNewPasswordPlaceholder} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" onKeyDown={(e) => { if (e.key === "Enter") handleReset(); }} />
+							</div>
+							{error && <p className="text-red-400 text-sm text-center">{error}</p>}
+							<button type="button" onClick={handleReset} disabled={resetMutation.isPending} className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50">
+								{resetMutation.isPending ? t.resetting : t.resetPassword}
 							</button>
-							<button type="button" onClick={() => { setMode("login"); setError(""); setRecoveryEmail(""); setRecoverySearched(false); }} className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-gray-300 text-sm">
+						</div>
+					) : recoverySent ? (
+						// Email sent confirmation
+						<div className="space-y-4 text-center">
+							<div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+								<Mail className="w-6 h-6 text-green-400" />
+							</div>
+							<p className="text-green-400 font-semibold">{lang === "es" ? "¡Email enviado!" : "Email sent!"}</p>
+							<p className="text-gray-400 text-sm">{lang === "es" ? `Revisa tu correo ${recoveryEmail} y haz click en el link para restablecer tu contraseña.` : `Check your email ${recoveryEmail} and click the link to reset your password.`}</p>
+							<button type="button" onClick={() => { setMode("login"); setRecoverySent(false); setRecoveryEmail(""); }} className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-gray-300 text-sm">
 								<ArrowLeft className="w-4 h-4" />{t.backToLogin}
 							</button>
 						</div>
-					) : recoveryQuery.isLoading ? (
-						<p className="text-gray-400 text-center py-8">{t.loading}</p>
-					) : recoveryQuery.data?.found ? (
-						resetDone ? (
-							<div className="space-y-4 text-center">
-								<div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
-									<Check className="w-6 h-6 text-green-400" />
-								</div>
-								<p className="text-green-400 text-sm">{t.resetSuccess}</p>
-								<button
-									type="button"
-									onClick={() => {
-										setMode("login");
-										setResetDone(false);
-										setNewPassword("");
-										setConfirmNewPassword("");
-										setError("");
-									}}
-									className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all"
-								>
-									{t.backToLogin}
-								</button>
+					) : resetDone ? (
+						<div className="space-y-4 text-center">
+							<div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+								<Check className="w-6 h-6 text-green-400" />
 							</div>
-						) : (
-							<div className="space-y-4">
-								<p className="text-gray-400 text-sm text-center">
-									{t.recoveryDesc}
-								</p>
-								<div className="bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-center">
-									<p className="text-xs text-gray-500 mb-1">{t.email}</p>
-									<p className="text-white font-mono">
-										{recoveryQuery.data.maskedEmail}
-									</p>
-								</div>
-								<div>
-									<label
-										htmlFor="new-password"
-										className="block text-sm font-medium text-gray-300 mb-1"
-									>
-										<span className="flex items-center gap-1.5">
-											<Lock className="w-3.5 h-3.5" />
-											{t.newPassword}
-										</span>
-									</label>
-									<input
-										id="new-password"
-										type="password"
-										value={newPassword}
-										onChange={(e) => setNewPassword(e.target.value)}
-										placeholder={t.newPasswordPlaceholder}
-										className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-										onKeyDown={(e) => {
-											if (e.key === "Enter") handleReset();
-										}}
-									/>
-								</div>
-								<div>
-									<label
-										htmlFor="confirm-new-password"
-										className="block text-sm font-medium text-gray-300 mb-1"
-									>
-										<span className="flex items-center gap-1.5">
-											<Shield className="w-3.5 h-3.5" />
-											{t.confirmNewPassword}
-										</span>
-									</label>
-									<input
-										id="confirm-new-password"
-										type="password"
-										value={confirmNewPassword}
-										onChange={(e) => setConfirmNewPassword(e.target.value)}
-										placeholder={t.confirmNewPasswordPlaceholder}
-										className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-										onKeyDown={(e) => {
-											if (e.key === "Enter") handleReset();
-										}}
-									/>
-								</div>
-
-								{error && (
-									<p className="text-red-400 text-sm text-center">{error}</p>
-								)}
+							<p className="text-green-400 text-sm">{t.resetSuccess}</p>
+							<button type="button" onClick={() => { setMode("login"); setResetDone(false); setResetToken(""); setNewPassword(""); setConfirmNewPassword(""); setError(""); }} className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all">
+								{t.backToLogin}
+							</button>
+						</div>
+					) : (
+						// Email input form
+						<div className="space-y-4">
+							<p className="text-gray-400 text-sm text-center">
+								{lang === "es" ? "Ingresa tu correo y te enviaremos un link para restablecer tu contraseña" : "Enter your email and we will send you a link to reset your password"}
+							</p>
+							<input type="email" value={recoveryEmail} onChange={(e) => { setRecoveryEmail(e.target.value); setRecoveryNotFound(false); }} placeholder={t.emailPlaceholder} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" onKeyDown={(e) => { if (e.key === "Enter") handleSendRecovery(); }} />
+							{recoveryNotFound && <p className="text-red-400 text-sm text-center">{lang === "es" ? "No encontramos una cuenta con ese correo" : "No account found with that email"}</p>}
+							<button type="button" onClick={handleSendRecovery} disabled={!recoveryEmail.includes("@") || recoveryLoading} className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition-all">
+								{recoveryLoading ? (lang === "es" ? "Enviando..." : "Sending...") : (lang === "es" ? "Enviar link de recuperación" : "Send reset link")}
+							</button>
+							<button type="button" onClick={() => { setMode("login"); setError(""); setRecoveryEmail(""); setRecoveryNotFound(false); }} className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-gray-300 text-sm">
+								<ArrowLeft className="w-4 h-4" />{t.backToLogin}
+							</button>
+						</div>
+					)}
 
 								<button
 									type="button"

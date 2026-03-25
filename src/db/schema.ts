@@ -140,3 +140,15 @@ export const appointments = sqliteTable("appointments", {
 		.notNull()
 		.default(sql`(unixepoch())`),
 });
+
+// Password reset tokens
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	userId: integer("user_id").notNull().references(() => users.id),
+	token: text("token").notNull().unique(),
+	expiresAt: integer("expires_at").notNull(),
+	used: integer("used", { mode: "boolean" }).notNull().default(false),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+});

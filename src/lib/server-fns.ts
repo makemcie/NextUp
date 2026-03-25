@@ -4,7 +4,7 @@ import { getRequest, setCookie, deleteCookie } from "@tanstack/react-start/serve
 import bcrypt from "bcryptjs";
 import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { broadcast, db } from "@/db";
-import { appointments, barbers, clients, sessions, shops, users, visits } from "@/db/schema";
+import { appointments, barbers, clients, sessions, shops, users, visits, passwordResetTokens } from "@/db/schema";
 import { sendSMS } from "@/lib/messaging";
 
 async function getTwilioCreds() {
@@ -228,41 +228,95 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 	return { success: true as const };
 });
 
-export const getRecoveryInfo = createServerFn({ method: "GET" })
+export const getRecoveryInfo = createServerFn({ method: "POST" })
 	.inputValidator((input: { email: string }) => input)
 	.handler(async ({ data }) => {
-		if (!data.email || !data.email.includes("@")) return { found: false as const };
+		if (!data.email || !data.email.includes("@")) return { found: false as const, sent: false };
 		const user = await (await db())
 			.select({ id: users.id, email: users.email })
 			.from(users)
 			.where(eq(users.email, data.email.toLowerCase().trim()))
 			.limit(1)
 			.all();
-		if (!user[0]) return { found: false as const };
-		const email = user[0].email;
-		const [local, domain] = email.split("@");
-		const masked = local.length <= 2 ? `${local[0]}***@${domain}` : `${local[0]}***${local[local.length - 1]}@${domain}`;
-		return { found: true as const, maskedEmail: masked, userId: user[0].id };
+		if (!user[0]) return { found: false as const, sent: false };
+
+		// Generate secure token
+		const tokenBytes = new Uint8Array(32);
+		crypto.getRandomValues(tokenBytes);
+		const token = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+		const expiresAt = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+
+		// Store token
+		await (await db())
+			.insert(passwordResetTokens)
+			.values({ userId: user[0].id, token, expiresAt })
+			.run();
+
+		// Send email with reset link
+		const mod = await import("cloudflare:workers");
+		const env = mod.env as Record<string, string>;
+		const apiKey = env.RESEND_API_KEY ?? "";
+		const resetLink = `https://goolinext.com/?reset=${token}`;
+
+		if (apiKey) {
+			await fetch("https://api.resend.com/emails", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Authorization": `Bearer ${apiKey}`,
+				},
+				body: JSON.stringify({
+					from: "Goolinext <support@goolinext.com>",
+					to: [user[0].email],
+					subject: "Reset your Goolinext password",
+					html: `
+						<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f0f14;color:white;border-radius:16px;">
+							<h1 style="color:#f97316;font-size:24px;margin-bottom:16px;">Reset your password</h1>
+							<p style="color:#94a3b8;margin-bottom:24px;">Click the button below to reset your Goolinext password. This link expires in 1 hour.</p>
+							<a href="${resetLink}" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#f97316,#ea580c);color:white;text-decoration:none;border-radius:12px;font-weight:700;font-size:16px;">Reset Password</a>
+							<p style="color:#64748b;font-size:13px;margin-top:24px;">If you didn't request this, you can ignore this email. The link expires in 1 hour.</p>
+						</div>
+					`,
+				}),
+			}).catch(() => {});
+		}
+
+		return { found: true as const, sent: true };
 	});
 
 export const resetPassword = createServerFn({ method: "POST" })
-	.inputValidator((input: { email: string; newPassword: string }) => input)
+	.inputValidator((input: { token: string; newPassword: string }) => input)
 	.handler(async ({ data }) => {
 		if (data.newPassword.length < 6) {
 			return { success: false as const, error: "PASSWORD_TOO_SHORT" as const };
 		}
-		const user = await (await db())
-			.select({ id: users.id })
-			.from(users)
-			.where(eq(users.email, data.email.toLowerCase().trim()))
+
+		// Validate token
+		const now = Math.floor(Date.now() / 1000);
+		const resetToken = await (await db())
+			.select()
+			.from(passwordResetTokens)
+			.where(eq(passwordResetTokens.token, data.token))
 			.limit(1)
 			.all();
-		if (!user[0]) return { success: false as const, error: "USER_NOT_FOUND" as const };
+
+		if (!resetToken[0]) return { success: false as const, error: "INVALID_TOKEN" as const };
+		if (resetToken[0].used) return { success: false as const, error: "TOKEN_USED" as const };
+		if (resetToken[0].expiresAt < now) return { success: false as const, error: "TOKEN_EXPIRED" as const };
+
+		// Update password
 		const passwordHash = await bcrypt.hash(data.newPassword, 10);
 		await (await db())
 			.update(users)
 			.set({ passwordHash })
-			.where(eq(users.id, user[0].id));
+			.where(eq(users.id, resetToken[0].userId));
+
+		// Mark token as used
+		await (await db())
+			.update(passwordResetTokens)
+			.set({ used: true })
+			.where(eq(passwordResetTokens.token, data.token));
+
 		return { success: true as const };
 	});
 
