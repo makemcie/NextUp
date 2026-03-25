@@ -311,6 +311,77 @@ function BusinessPage() {
 					</>
 				)}
 
+				{/* APPOINTMENT BOOKING MODAL */}
+				{showApptForm && (
+					<div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center" }} onClick={() => setShowApptForm(false)}>
+						<div style={{ background:"#0f0f14",borderRadius:"24px 24px 0 0",padding:"32px 24px 48px",width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto" }} onClick={e => e.stopPropagation()}>
+							<div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24 }}>
+								<h2 style={{ fontSize:20,fontWeight:800,color:"white",margin:0 }}>📅 {T.bookAppt}</h2>
+								<button type="button" onClick={() => setShowApptForm(false)} style={{ background:"rgba(255,255,255,0.08)",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",color:"white",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center" }}>✕</button>
+							</div>
+
+							{apptStep === 4 ? (
+								<div style={{ textAlign:"center",padding:"20px 0" }}>
+									<div style={{ fontSize:64,marginBottom:16 }}>✅</div>
+									<h3 style={{ color:"white",fontSize:22,fontWeight:800,marginBottom:8 }}>{T.apptConfirmed}</h3>
+									<p style={{ color:"#64748b",fontSize:14,marginBottom:24 }}>{T.apptConfirmedMsg}</p>
+									<button type="button" onClick={() => { setShowApptForm(false); setApptStep(1); setApptBarber(0); setApptDate(""); setApptTime(""); setApptName(""); setApptPhone(""); }} style={{ padding:"14px 40px",background:"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer" }}>OK</button>
+								</div>
+							) : apptStep === 1 ? (
+								<div style={{ display:"flex",flexDirection:"column",gap:20 }}>
+									<div>
+										<p style={{ color:"#94a3b8",fontSize:13,marginBottom:10,fontWeight:600 }}>{T.selectBarber}</p>
+										<div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
+											{(allBarbers ?? []).map(b => (
+												<button key={b.id} type="button" onClick={() => setApptBarber(b.id)} style={{ padding:"10px 18px",borderRadius:12,border:`2px solid ${apptBarber===b.id?"#6366f1":"rgba(255,255,255,0.1)"}`,background:apptBarber===b.id?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.04)",color:apptBarber===b.id?"#a5b4fc":"#94a3b8",fontWeight:600,fontSize:14,cursor:"pointer" }}>
+													{b.name}
+												</button>
+											))}
+										</div>
+									</div>
+									<div>
+										<p style={{ color:"#94a3b8",fontSize:13,marginBottom:10,fontWeight:600 }}>{T.selectDate}</p>
+										<input type="date" value={apptDate} min={new Date().toISOString().split("T")[0]} onChange={e => setApptDate(e.target.value)} style={{ width:"100%",padding:"14px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"white",fontSize:15,boxSizing:"border-box" }} />
+									</div>
+									<button type="button" disabled={!apptBarber || !apptDate} onClick={() => setApptStep(2)} style={{ padding:"16px",background:(!apptBarber||!apptDate)?"rgba(99,102,241,0.3)":"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:(!apptBarber||!apptDate)?"not-allowed":"pointer",opacity:(!apptBarber||!apptDate)?0.5:1 }}>{T.next} →</button>
+								</div>
+							) : apptStep === 2 ? (
+								<div style={{ display:"flex",flexDirection:"column",gap:16 }}>
+									<p style={{ color:"#94a3b8",fontSize:13,fontWeight:600 }}>{T.selectTime}</p>
+									{availableSlots?.slots && availableSlots.slots.length > 0 ? (
+										<div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8 }}>
+											{availableSlots.slots.map(s => {
+												const [h,m] = s.split(":").map(Number);
+												const fmt = `${h%12||12}:${m.toString().padStart(2,"0")} ${h>=12?"PM":"AM"}`;
+												return <button key={s} type="button" onClick={() => setApptTime(s)} style={{ padding:"12px 8px",borderRadius:10,border:`2px solid ${apptTime===s?"#6366f1":"rgba(255,255,255,0.08)"}`,background:apptTime===s?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.03)",color:apptTime===s?"#a5b4fc":"#94a3b8",fontWeight:600,fontSize:13,cursor:"pointer" }}>{fmt}</button>;
+											})}
+										</div>
+									) : (
+										<p style={{ color:"#475569",textAlign:"center",padding:"20px 0" }}>{lang==="es"?"No hay horarios disponibles para este día":"No available slots for this day"}</p>
+									)}
+									<div style={{ display:"flex",gap:10 }}>
+										<button type="button" onClick={() => setApptStep(1)} style={{ flex:1,padding:"14px",background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"none",borderRadius:12,fontSize:14,cursor:"pointer" }}>← {T.back}</button>
+										<button type="button" disabled={!apptTime} onClick={() => setApptStep(3)} style={{ flex:2,padding:"14px",background:!apptTime?"rgba(99,102,241,0.3)":"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:!apptTime?"not-allowed":"pointer",opacity:!apptTime?0.5:1 }}>{T.next} →</button>
+									</div>
+								</div>
+							) : (
+								<div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+									<input type="text" placeholder={T.yourName} value={apptName} onChange={e => setApptName(e.target.value)} style={{ padding:"14px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"white",fontSize:15,outline:"none" }} />
+									<input type="tel" placeholder={T.yourPhone} value={apptPhone} onChange={e => setApptPhone(e.target.value)} style={{ padding:"14px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"white",fontSize:15,outline:"none" }} />
+									<div style={{ display:"flex",gap:10 }}>
+										<button type="button" onClick={() => setApptStep(2)} style={{ flex:1,padding:"14px",background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"none",borderRadius:12,fontSize:14,cursor:"pointer" }}>← {T.back}</button>
+										<button type="button" disabled={!apptName.trim()||!apptPhone.trim()||apptLoading} onClick={async () => {
+											try { setApptLoading(true); await createAppointment({ data: { shopId: id, barberId: apptBarber, clientName: apptName, clientPhone: apptPhone, date: apptDate, time: apptTime } }); setApptStep(4); } catch {} finally { setApptLoading(false); }
+										}} style={{ flex:2,padding:"14px",background:(!apptName.trim()||!apptPhone.trim())||apptLoading?"rgba(99,102,241,0.3)":"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",opacity:(!apptName.trim()||!apptPhone.trim())||apptLoading?0.5:1 }}>
+											{apptLoading ? "..." : T.confirmAppt}
+										</button>
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+
 				{/* FOOTER */}
 				<div style={{ borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:28,textAlign:"center",marginTop:48 }}>
 					<div style={{ display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginBottom:6 }}>
