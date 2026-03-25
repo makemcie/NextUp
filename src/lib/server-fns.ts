@@ -378,7 +378,7 @@ function generateAccessCode(): string {
 
 export const createBarber = createServerFn({ method: "POST" })
 	.inputValidator(
-		(input: { shopId: number; name: string; specialty?: string; phone?: string }) => input,
+		(input: { shopId: number; name: string; specialty?: string; phone: string }) => input,
 	)
 	.handler(async ({ data }) => {
 		const userId = await getUserId();

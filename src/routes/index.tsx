@@ -1876,13 +1876,13 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 						type="tel"
 						value={barberPhone}
 						onChange={(e) => setBarberPhone(e.target.value)}
-						placeholder={lang === "es" ? "Teléfono del empleado (opcional)" : "Employee phone (optional)"}
+						placeholder={lang === "es" ? "Teléfono del empleado +1XXXXXXXXXX" : "Employee phone +1XXXXXXXXXX"}
 						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
 					/>
 					<button
 						type="button"
 						onClick={() => addMutation.mutate()}
-						disabled={!name.trim() || addMutation.isPending}
+						disabled={!name.trim() || !barberPhone.trim() || addMutation.isPending}
 						className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 disabled:opacity-50"
 					>
 						{addMutation.isPending ? t.addingBarber : t.addBarber}
