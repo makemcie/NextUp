@@ -1164,6 +1164,43 @@ function BarberPortal({
 					{tb.nextClient}
 				</button>
 
+				{/* Today's Appointments */}
+				{myAppointments && myAppointments.length > 0 && (
+					<div className="bg-gray-900/60 border border-amber-500/20 rounded-2xl overflow-hidden">
+						<div className="px-5 py-3 border-b border-gray-800 flex items-center gap-2">
+							<CalendarCheck className="w-4 h-4 text-amber-400" />
+							<p className="text-sm font-medium text-amber-400">
+								{lang === "es" ? "Mis citas de hoy" : "My appointments today"} ({myAppointments.length})
+							</p>
+						</div>
+						<div className="divide-y divide-gray-800/50">
+							{myAppointments.map(appt => (
+								<div key={appt.id} className="px-5 py-3 flex items-center justify-between gap-3">
+									<div>
+										<p className="text-white font-medium text-sm">{appt.clientName}</p>
+										<p className="text-gray-500 text-xs flex items-center gap-1">
+											<Clock className="w-3 h-3" />
+											{(() => { const [h,m] = appt.appointmentTime.split(":").map(Number); return `${h%12||12}:${m.toString().padStart(2,"0")} ${h>=12?"PM":"AM"}`; })()}
+										</p>
+										{appt.clientPhone && <p className="text-gray-600 text-xs">{appt.clientPhone}</p>}
+										{(appt as any).cancelRequested && <span className="text-xs text-orange-400">⏳ {lang === "es" ? "Cancelación pendiente aprobación" : "Cancellation pending approval"}</span>}
+									</div>
+									{!(appt as any).cancelRequested && (
+										<button
+											type="button"
+											onClick={() => requestCancelMutation.mutate(appt.id)}
+											disabled={requestCancelMutation.isPending}
+											className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors flex-shrink-0"
+										>
+											{lang === "es" ? "Solicitar cancelación" : "Request cancel"}
+										</button>
+									)}
+								</div>
+							))}
+						</div>
+					</div>
+				)}
+
 				{/* Waiting list */}
 				{queue?.waitingClients && queue.waitingClients.length > 0 ? (
 					<div className="bg-gray-900/60 border border-gray-800 rounded-2xl overflow-hidden">
