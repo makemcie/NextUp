@@ -2994,6 +2994,7 @@ function SettingsView({
 
 	const savePhoneMutation = useMutation({
 		mutationFn: () => updateOwnerPhone({ data: { phone: ownerPhone } }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ownerPhone"] }),
 	});
 	const defaultHours = {
 		0: { open: "09:00", close: "18:00", closed: true },
@@ -3011,8 +3012,9 @@ function SettingsView({
 	const logoInputRef = useRef<HTMLInputElement>(null);
 
 	const mutation = useMutation({
-		mutationFn: () =>
-			updateShop({
+		mutationFn: async () => {
+			// Save shop settings
+			await updateShop({
 				data: {
 					id: shop.id,
 					googleReviewLink: googleLink || undefined,
@@ -3027,8 +3029,16 @@ function SettingsView({
 					logoUrl: logoUrl || undefined,
 					weeklyHours: JSON.stringify(weeklyHours),
 				},
-			}),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["myShop"] }),
+			});
+			// Also save owner phone if provided
+			if (ownerPhone) {
+				await updateOwnerPhone({ data: { phone: ownerPhone } });
+			}
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["myShop"] });
+			queryClient.invalidateQueries({ queryKey: ["ownerPhone"] });
+		},
 	});
 
 	return (
