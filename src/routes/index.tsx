@@ -870,6 +870,13 @@ function Dashboard({
 		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help" | "appointments"
 	>("dashboard");
 
+	const { data: cancelRequests } = useQuery({
+		queryKey: ["cancelRequests", shop.id],
+		queryFn: () => getShopAppointments({ data: { shopId: shop.id } }),
+		refetchInterval: 30000,
+	});
+	const pendingCancels = (cancelRequests ?? []).filter((a: any) => a.cancelRequested).length;
+
 	const { data: subStatus, isLoading: subLoading, refetch: refetchSub } = useQuery({
 		queryKey: ["subscriptionStatus"],
 		queryFn: () => getSubscriptionStatus(),
@@ -921,7 +928,7 @@ function Dashboard({
 		{ key: "qr" as const, label: t.tabQR, icon: QrCode },
 		{ key: "clients" as const, label: t.tabClients, icon: Database },
 		{ key: "settings" as const, label: t.tabSettings, icon: Settings },
-		{ key: "appointments" as const, label: lang === "es" ? "Citas" : "Appts", icon: CalendarCheck },
+		{ key: "appointments" as const, label: lang === "es" ? `Citas${pendingCancels > 0 ? ` (${pendingCancels})` : ""}` : `Appts${pendingCancels > 0 ? ` (${pendingCancels})` : ""}`, icon: CalendarCheck },
 		{ key: "help" as const, label: lang === "es" ? "Ayuda" : "Help", icon: Bell },
 	];
 
@@ -2071,6 +2078,26 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 										</div>
 									)}
 								</div>
+								{/* Barber Phone for SMS notifications */}
+								<div className="mt-3 pt-3 border-t border-gray-800">
+									<div className="flex items-center gap-2">
+										<span className="text-xs text-gray-500 flex items-center gap-1">📱 {lang === "es" ? "Tel barbero:" : "Barber phone:"}</span>
+										{editingPhone?.id === b.id ? (
+											<>
+												<input type="tel" value={editingPhone.phone} onChange={(e) => setEditingPhone({ id: b.id, phone: e.target.value })} placeholder="+1XXXXXXXXXX" className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs focus:outline-none" />
+												<button type="button" onClick={() => phoneMutation.mutate({ barberId: b.id, phone: editingPhone.phone })} className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium">✓</button>
+												<button type="button" onClick={() => setEditingPhone(null)} className="px-2 py-1 text-gray-500 text-xs">✕</button>
+											</>
+										) : (
+											<>
+												<span className="text-xs text-gray-400 flex-1">{(b as any).phone || "—"}</span>
+												<button type="button" onClick={() => setEditingPhone({ id: b.id, phone: (b as any).phone ?? "" })} className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+													{lang === "es" ? "Editar" : "Edit"}
+												</button>
+											</>
+										)}
+									</div>
+								</div>
 							</div>
 						);
 					})}
@@ -3064,7 +3091,33 @@ function SettingsView({
 				</div>
 			</div>
 
-
+			{/* Owner Phone */}
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
+				<h3 className="text-lg font-semibold text-white flex items-center gap-2">
+					📱 {lang === "es" ? "Tu número de teléfono" : "Your phone number"}
+				</h3>
+				<p className="text-sm text-gray-500">
+					{lang === "es" ? "Recibirás SMS cuando un barbero solicite cancelar una cita." : "You will receive SMS when a barber requests to cancel an appointment."}
+				</p>
+				<div className="flex gap-3">
+					<input
+						type="tel"
+						value={ownerPhone}
+						onChange={(e) => setOwnerPhone(e.target.value)}
+						placeholder="+1XXXXXXXXXX"
+						className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+					/>
+					<button
+						type="button"
+						onClick={() => savePhoneMutation.mutate()}
+						disabled={savePhoneMutation.isPending}
+						className="px-4 py-3 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-all text-sm font-medium"
+					>
+						{savePhoneMutation.isPending ? "..." : (lang === "es" ? "Guardar" : "Save")}
+					</button>
+				</div>
+				{savePhoneMutation.isSuccess && <p className="text-green-400 text-sm">✅ {lang === "es" ? "Guardado" : "Saved"}</p>}
+			</div>
 
 			{/* SMS Consent (Opt-in) */}
 			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
