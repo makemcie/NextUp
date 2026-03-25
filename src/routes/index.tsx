@@ -3337,6 +3337,116 @@ function SettingsView({
 			{mutation.isSuccess && (
 				<p className="text-center text-green-400 text-sm">{t.saved}</p>
 			)}
+			<CancelSubscriptionSection lang={lang} />
 		</div>
+	);
+}
+
+// ============ CANCEL SUBSCRIPTION ============
+function CancelSubscriptionSection({ lang }: { lang: Lang }) {
+	const queryClient = useQueryClient();
+	const [showModal, setShowModal] = useState(false);
+	const [reason, setReason] = useState("");
+	const [customReason, setCustomReason] = useState("");
+	const [step, setStep] = useState<"select" | "confirm" | "done">("select");
+
+	const reasons = lang === "es" ? [
+		"Es muy caro para mi negocio",
+		"No uso todas las funciones",
+		"Encontré otra solución",
+		"Mi negocio cerró temporalmente",
+		"Problemas técnicos con el sistema",
+		"Otro motivo",
+	] : [
+		"It's too expensive for my business",
+		"I don't use all the features",
+		"I found another solution",
+		"My business closed temporarily",
+		"Technical issues with the system",
+		"Other reason",
+	];
+
+	const { data: subStatus } = useQuery({
+		queryKey: ["subscriptionStatus"],
+		queryFn: () => getSubscriptionStatus(),
+	});
+
+	const cancelMutation = useMutation({
+		mutationFn: () => {
+			const finalReason = reason === (lang === "es" ? "Otro motivo" : "Other reason") ? customReason : reason;
+			return cancelSubscription({ data: { reason: finalReason } });
+		},
+		onSuccess: () => {
+			setStep("done");
+			queryClient.invalidateQueries({ queryKey: ["subscriptionStatus"] });
+			setTimeout(() => { window.location.href = "/"; }, 3000);
+		},
+	});
+
+	if (subStatus?.status !== "active") return null;
+
+	return (
+		<>
+			<div className="border-t border-gray-800 pt-6">
+				<div className="flex items-center justify-between">
+					<div>
+						<p className="text-sm font-medium text-gray-300">{lang === "es" ? "Cancelar suscripción" : "Cancel subscription"}</p>
+						<p className="text-xs text-gray-600 mt-0.5">{lang === "es" ? "Tu acceso continuará hasta el final del período actual" : "Your access continues until the end of the current period"}</p>
+					</div>
+					<button type="button" onClick={() => { setShowModal(true); setStep("select"); setReason(""); setCustomReason(""); }} className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-sm font-medium hover:bg-red-500/20 transition-all">
+						{lang === "es" ? "Cancelar membresía" : "Cancel membership"}
+					</button>
+				</div>
+			</div>
+
+			{showModal && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+					<div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md p-6 space-y-4">
+						{step === "done" ? (
+							<div className="text-center space-y-4">
+								<div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
+									<Check className="w-6 h-6 text-gray-400" />
+								</div>
+								<p className="text-white font-semibold">{lang === "es" ? "Suscripción cancelada" : "Subscription cancelled"}</p>
+								<p className="text-gray-400 text-sm">{lang === "es" ? "Lamentamos verte partir. Redirigiendo..." : "Sorry to see you go. Redirecting..."}</p>
+							</div>
+						) : step === "confirm" ? (
+							<div className="space-y-4">
+								<h3 className="text-lg font-semibold text-white">{lang === "es" ? "¿Estás seguro?" : "Are you sure?"}</h3>
+								<div className="bg-gray-800 rounded-xl p-4">
+									<p className="text-xs text-gray-500 mb-1">{lang === "es" ? "Motivo:" : "Reason:"}</p>
+									<p className="text-gray-300 text-sm">{reason === (lang === "es" ? "Otro motivo" : "Other reason") ? customReason : reason}</p>
+								</div>
+								<div className="flex gap-3">
+									<button type="button" onClick={() => setStep("select")} className="flex-1 py-2.5 bg-gray-800 text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-700 transition-all">{lang === "es" ? "Volver" : "Back"}</button>
+									<button type="button" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-all">
+										{cancelMutation.isPending ? "..." : (lang === "es" ? "Sí, cancelar" : "Yes, cancel")}
+									</button>
+								</div>
+							</div>
+						) : (
+							<div className="space-y-4">
+								<div className="flex items-center justify-between">
+									<h3 className="text-lg font-semibold text-white">{lang === "es" ? "¿Por qué cancelas?" : "Why are you cancelling?"}</h3>
+									<button type="button" onClick={() => setShowModal(false)} className="p-1.5 text-gray-500 hover:text-gray-300"><X className="w-4 h-4" /></button>
+								</div>
+								<div className="space-y-2">
+									{reasons.map((r) => (
+										<button key={r} type="button" onClick={() => setReason(r)} className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all border ${reason === r ? "border-amber-500/50 bg-amber-500/10 text-amber-400" : "border-gray-700 bg-gray-800/50 text-gray-300 hover:border-gray-600"}`}>{r}</button>
+									))}
+								</div>
+								{reason === (lang === "es" ? "Otro motivo" : "Other reason") && (
+									<textarea value={customReason} onChange={(e) => setCustomReason(e.target.value)} rows={3} placeholder={lang === "es" ? "Cuéntanos más..." : "Tell us more..."} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none text-sm" />
+								)}
+								<div className="flex gap-3">
+									<button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 bg-gray-800 text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-700 transition-all">{lang === "es" ? "Cerrar" : "Close"}</button>
+									<button type="button" onClick={() => setStep("confirm")} disabled={!reason || (reason === (lang === "es" ? "Otro motivo" : "Other reason") && !customReason.trim())} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-all">{lang === "es" ? "Continuar" : "Continue"}</button>
+								</div>
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+		</>
 	);
 }
