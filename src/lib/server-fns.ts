@@ -1977,12 +1977,13 @@ export const getSubscriptionStatus = createServerFn({ method: "GET" })
 
 // Cancel subscription
 export const cancelSubscription = createServerFn({ method: "POST" })
-	.handler(async () => {
+	.inputValidator((input: { reason?: string }) => input)
+	.handler(async ({ data }) => {
 		const user = await getSessionUser();
 		if (!user) throw new Error("Not authenticated");
 
 		const shop = await (await db())
-			.select({ stripeSubscriptionId: shops.stripeSubscriptionId })
+			.select({ stripeSubscriptionId: shops.stripeSubscriptionId, name: shops.name })
 			.from(shops)
 			.where(eq(shops.ownerId, user.id))
 			.limit(1)
@@ -2001,6 +2002,44 @@ export const cancelSubscription = createServerFn({ method: "POST" })
 			.update(shops)
 			.set({ subscriptionStatus: "canceled" })
 			.where(eq(shops.ownerId, user.id));
+
+		// Delete session to log out the user
+		const cookieHeader = (await import("@tanstack/react-start/server")).getRequest().headers.get("cookie") ?? "";
+		const sessionToken = cookieHeader.split(";").find((c: string) => c.trim().startsWith("session="))?.split("=")[1]?.trim();
+		if (sessionToken) {
+			await (await db()).delete(sessions).where(eq(sessions.id, sessionToken)).run();
+		}
+
+		// Send email to Goolinext admin (you)
+		const mod = await import("cloudflare:workers");
+		const env = mod.env as Record<string, string>;
+		const apiKey = env.RESEND_API_KEY ?? "";
+
+		if (apiKey) {
+			// Email to admin
+			await fetch("https://api.resend.com/emails", {
+				method: "POST",
+				headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+				body: JSON.stringify({
+					from: "Goolinext <support@goolinext.com>",
+					to: ["support@goolinext.com"],
+					subject: `❌ Cancelación de membresía - ${shop[0].name}`,
+					html: `<div style="font-family:sans-serif;padding:24px"><h2>Membresía cancelada</h2><p><strong>Negocio:</strong> ${shop[0].name}</p><p><strong>Email:</strong> ${user.email}</p><p><strong>Motivo:</strong> ${data.reason ?? "No especificado"}</p></div>`,
+				}),
+			}).catch(() => {});
+
+			// Email to client
+			await fetch("https://api.resend.com/emails", {
+				method: "POST",
+				headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+				body: JSON.stringify({
+					from: "Goolinext <support@goolinext.com>",
+					to: [user.email],
+					subject: "Tu membresía de Goolinext ha sido cancelada",
+					html: `<div style="font-family:sans-serif;padding:24px;background:#0f0f14;color:white;border-radius:16px"><h2 style="color:#f97316">Membresía cancelada</h2><p style="color:#94a3b8">Hola, te confirmamos que tu suscripción de Goolinext para <strong style="color:white">${shop[0].name}</strong> ha sido cancelada exitosamente.</p><p style="color:#94a3b8">Tu acceso continuará hasta el final del período actual. Si cambias de opinión puedes reactivar tu cuenta en cualquier momento.</p><p style="color:#64748b;font-size:13px">¿Tienes preguntas? Escríbenos a support@goolinext.com</p></div>`,
+				}),
+			}).catch(() => {});
+		}
 
 		return { success: true };
 	});

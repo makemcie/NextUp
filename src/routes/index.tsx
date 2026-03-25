@@ -78,6 +78,7 @@ import {
 	getSubscriptionStatus,
 	cancelSubscription,
 	activateSubscription,
+	cancelSubscription,
 	getShopAppointments,
 	cancelAppointment,
 	getAvailableSlots,
