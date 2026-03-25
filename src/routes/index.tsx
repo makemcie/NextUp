@@ -1695,6 +1695,7 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 	const queryClient = useQueryClient();
 	const [name, setName] = useState("");
 	const [specialty, setSpecialty] = useState("");
+	const [barberPhone, setBarberPhone] = useState("");
 	const [showForm, setShowForm] = useState(false);
 	const [copiedId, setCopiedId] = useState<number | null>(null);
 
@@ -1706,12 +1707,13 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 	const addMutation = useMutation({
 		mutationFn: () =>
 			createBarber({
-				data: { shopId, name, specialty: specialty || undefined },
+				data: { shopId, name, specialty: specialty || undefined, phone: barberPhone || undefined },
 			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["barbers", shopId] });
 			setName("");
 			setSpecialty("");
+			setBarberPhone("");
 			setShowForm(false);
 		},
 	});
@@ -1868,6 +1870,13 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 						value={specialty}
 						onChange={(e) => setSpecialty(e.target.value)}
 						placeholder={t.barberSpecialty}
+						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+					/>
+					<input
+						type="tel"
+						value={barberPhone}
+						onChange={(e) => setBarberPhone(e.target.value)}
+						placeholder={lang === "es" ? "Teléfono del empleado (opcional)" : "Employee phone (optional)"}
 						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
 					/>
 					<button
