@@ -2187,8 +2187,8 @@ export const getShopAppointments = createServerFn({ method: "GET" })
 			conditions.push(eq(appointments.appointmentDate, data.date));
 		}
 
-		// Only show scheduled and cancel_requested appointments
-		conditions.push(or(eq(appointments.status, "scheduled"), eq(appointments.status, "cancel_requested")) as any);
+		// Only show active appointments (not cancelled or completed)
+		conditions.push(eq(appointments.status, "scheduled"));
 
 		const appts = await (await db())
 			.select({
