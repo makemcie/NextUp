@@ -2152,6 +2152,9 @@ export const createAppointment = createServerFn({ method: "POST" })
 			.limit(1)
 			.all();
 
+		// Notify barber of new appointment
+		notifyBarberNewAppointment(data.barberId, data.clientName, data.date, data.time).catch(() => {});
+
 		// Send confirmation SMS
 		const creds = await getTwilioCreds();
 		if (creds.sid && data.clientPhone) {
@@ -2184,6 +2187,9 @@ export const getShopAppointments = createServerFn({ method: "GET" })
 			conditions.push(eq(appointments.appointmentDate, data.date));
 		}
 
+		// Only show scheduled and cancel_requested appointments
+		conditions.push(or(eq(appointments.status, "scheduled"), eq(appointments.status, "cancel_requested")) as any);
+
 		const appts = await (await db())
 			.select({
 				id: appointments.id,
@@ -2195,6 +2201,7 @@ export const getShopAppointments = createServerFn({ method: "GET" })
 				notes: appointments.notes,
 				barberId: appointments.barberId,
 				barberName: barbers.name,
+				cancelRequested: appointments.cancelRequested,
 			})
 			.from(appointments)
 			.leftJoin(barbers, eq(appointments.barberId, barbers.id))
@@ -2236,6 +2243,34 @@ export const getBarberAppointments = createServerFn({ method: "GET" })
 			.orderBy(asc(appointments.appointmentTime))
 			.all();
 	});
+
+// Send SMS to barber when appointment is created
+async function notifyBarberNewAppointment(barberId: number, clientName: string, date: string, time: string) {
+	const barber = await (await db())
+		.select({ phone: barbers.phone, name: barbers.name })
+		.from(barbers)
+		.where(eq(barbers.id, barberId))
+		.limit(1)
+		.all();
+
+	if (!barber[0]?.phone) return;
+
+	const creds = await getTwilioCreds();
+	if (!creds.sid) return;
+
+	const dateFormatted = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+	const [h, m] = time.split(":").map(Number);
+	const fmt = `${h%12||12}:${m.toString().padStart(2,"0")} ${h>=12?"PM":"AM"}`;
+
+	await sendSMS({
+		to: barber[0].phone,
+		body: `📅 New appointment!
+Client: ${clientName}
+${dateFormatted} at ${fmt}
+Check your portal for details.`,
+		...creds,
+	}).catch(() => {});
+}
 
 // Cancel appointment
 export const cancelAppointment = createServerFn({ method: "POST" })
