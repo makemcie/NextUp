@@ -3383,8 +3383,6 @@ function CancelSubscriptionSection({ lang }: { lang: Lang }) {
 		},
 	});
 
-	if (subStatus?.status !== "active") return null;
-
 	return (
 		<>
 			<div className="border-t border-gray-800 pt-6">
