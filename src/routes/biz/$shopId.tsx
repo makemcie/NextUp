@@ -55,8 +55,8 @@ function BusinessPage() {
 	});
 
 	const T = {
-		en: { tagline: "Professional Barbershop", sub: "Where every detail of your image reflects who you are and the level you belong to", call: "Call Now", reviews: "Reviews", findUs: "FIND US", team: "OUR TEAM", today: "TODAY", address: "ADDRESS", phone: "PHONE", googleReviews: "GOOGLE REVIEWS", leaveReview: "Leave us a review ⭐", available: "Available Today", off: "Not Today", hours: "HOURS", open: "Open", closed: "Closed", barbers: "barbers available", barber: "barber available", poweredBy: "Powered by", poweredSub: "Queue management for modern barbershops", openNow: "Open Now", closedNow: "Closed Now" },
-		es: { tagline: "Barbería Profesional", sub: "Donde cada detalle de tu imagen refleja quién eres y el nivel al que perteneces", call: "Llamar", reviews: "Reseñas", findUs: "ENCUÉNTRANOS", team: "NUESTRO EQUIPO", today: "HOY", address: "DIRECCIÓN", phone: "TELÉFONO", googleReviews: "RESEÑAS DE GOOGLE", leaveReview: "Déjanos una reseña ⭐", available: "Disponible Hoy", off: "No Disponible", hours: "HORARIO", open: "Abierto", closed: "Cerrado", barbers: "barberos disponibles", barber: "barbero disponible", poweredBy: "Con tecnología de", poweredSub: "Gestión de turnos para barberías modernas", openNow: "Abierto Ahora", closedNow: "Cerrado Ahora" },
+		en: { tagline: "Professional Style", sub: "Where every detail of your image reflects who you are and the level you belong to", call: "Call Now", reviews: "Reviews", findUs: "FIND US", team: "OUR TEAM", today: "TODAY", address: "ADDRESS", phone: "PHONE", googleReviews: "GOOGLE REVIEWS", leaveReview: "Leave us a review ⭐", available: "Available Today", off: "Not Today", hours: "HOURS", open: "Open", closed: "Closed", barbers: "barbers available", barber: "barber available", poweredBy: "Powered by", poweredSub: "Queue management for modern barbershops", openNow: "Open Now", closedNow: "Closed Now", bookAppt: "Book Appointment", selectBarber: "Select Barber", selectDate: "Select Date", selectTime: "Select Time", yourName: "Your Name", yourPhone: "Your Phone", confirmAppt: "Confirm Appointment", apptConfirmed: "Appointment Confirmed!", apptConfirmedMsg: "We will see you soon!", back: "Back", next: "Next" },
+		es: { tagline: "Estilo Profesional", sub: "Donde cada detalle de tu imagen refleja quién eres y el nivel al que perteneces", call: "Llamar", reviews: "Reseñas", findUs: "ENCUÉNTRANOS", team: "NUESTRO EQUIPO", today: "HOY", address: "DIRECCIÓN", phone: "TELÉFONO", googleReviews: "RESEÑAS DE GOOGLE", leaveReview: "Déjanos una reseña ⭐", available: "Disponible Hoy", off: "No Disponible", hours: "HORARIO", open: "Abierto", closed: "Cerrado", barbers: "barberos disponibles", barber: "barbero disponible", poweredBy: "Con tecnología de", poweredSub: "Gestión de turnos para barberías modernas", openNow: "Abierto Ahora", closedNow: "Cerrado Ahora", bookAppt: "Reservar Cita", selectBarber: "Seleccionar Barbero", selectDate: "Seleccionar Fecha", selectTime: "Seleccionar Hora", yourName: "Tu Nombre", yourPhone: "Tu Teléfono", confirmAppt: "Confirmar Cita", apptConfirmed: "¡Cita Confirmada!", apptConfirmedMsg: "¡Te esperamos pronto!", back: "Atrás", next: "Siguiente" },
 	}[lang];
 
 	const DAY = lang === "es" ? DAY_ES : DAY_EN;
@@ -163,6 +163,14 @@ function BusinessPage() {
 					{shop.googleReviewLink && (
 						<a href={shop.googleReviewLink} target="_blank" rel="noopener noreferrer" className="btn-secondary">⭐ {T.reviews}</a>
 					)}
+					<button
+						type="button"
+						onClick={() => { setShowApptForm(true); setApptStep(1); }}
+						className="btn-primary"
+						style={{ background:"linear-gradient(135deg,#6366f1,#4f46e5)",boxShadow:"0 8px 28px rgba(99,102,241,0.35)" }}
+					>
+						📅 {T.bookAppt}
+					</button>
 				</div>
 
 				<div style={{ position:"absolute",bottom:28,left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:6,opacity:0.3 }}>

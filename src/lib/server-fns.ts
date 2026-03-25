@@ -228,31 +228,41 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 	return { success: true as const };
 });
 
-export const getRecoveryInfo = createServerFn({ method: "GET" }).handler(async () => {
-	const sessionUser = await getSessionUser();
-	if (!sessionUser) return { found: false as const };
-	const email = sessionUser.email;
-	const [local, domain] = email.split("@");
-	const masked =
-		local.length <= 2
-			? `${local[0]}***@${domain}`
-			: `${local[0]}***${local[local.length - 1]}@${domain}`;
-	return { found: true as const, maskedEmail: masked };
-});
+export const getRecoveryInfo = createServerFn({ method: "GET" })
+	.inputValidator((input: { email: string }) => input)
+	.handler(async ({ data }) => {
+		if (!data.email || !data.email.includes("@")) return { found: false as const };
+		const user = await (await db())
+			.select({ id: users.id, email: users.email })
+			.from(users)
+			.where(eq(users.email, data.email.toLowerCase().trim()))
+			.limit(1)
+			.all();
+		if (!user[0]) return { found: false as const };
+		const email = user[0].email;
+		const [local, domain] = email.split("@");
+		const masked = local.length <= 2 ? `${local[0]}***@${domain}` : `${local[0]}***${local[local.length - 1]}@${domain}`;
+		return { found: true as const, maskedEmail: masked, userId: user[0].id };
+	});
 
 export const resetPassword = createServerFn({ method: "POST" })
-	.inputValidator((input: { newPassword: string }) => input)
+	.inputValidator((input: { email: string; newPassword: string }) => input)
 	.handler(async ({ data }) => {
-		const sessionUser = await getSessionUser();
-		if (!sessionUser) throw new Error("Not authenticated");
 		if (data.newPassword.length < 6) {
 			return { success: false as const, error: "PASSWORD_TOO_SHORT" as const };
 		}
+		const user = await (await db())
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.email, data.email.toLowerCase().trim()))
+			.limit(1)
+			.all();
+		if (!user[0]) return { success: false as const, error: "USER_NOT_FOUND" as const };
 		const passwordHash = await bcrypt.hash(data.newPassword, 10);
 		await (await db())
 			.update(users)
 			.set({ passwordHash })
-			.where(eq(users.id, sessionUser.id));
+			.where(eq(users.id, user[0].id));
 		return { success: true as const };
 	});
 

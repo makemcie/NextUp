@@ -148,10 +148,12 @@ function AuthScreen({
 	const [error, setError] = useState("");
 	const [resetDone, setResetDone] = useState(false);
 
+	const [recoveryEmail, setRecoveryEmail] = useState("");
+	const [recoverySearched, setRecoverySearched] = useState(false);
 	const recoveryQuery = useQuery({
-		queryKey: ["recoveryInfo"],
-		queryFn: () => getRecoveryInfo(),
-		enabled: mode === "recovery",
+		queryKey: ["recoveryInfo", recoveryEmail],
+		queryFn: () => getRecoveryInfo({ data: { email: recoveryEmail } }),
+		enabled: mode === "recovery" && recoverySearched && !!recoveryEmail,
 	});
 
 	const signupMutation = useMutation({
@@ -185,7 +187,7 @@ function AuthScreen({
 	});
 
 	const resetMutation = useMutation({
-		mutationFn: () => resetPassword({ data: { newPassword } }),
+		mutationFn: () => resetPassword({ data: { email: recoveryEmail, newPassword } }),
 		onSuccess: (result) => {
 			if (!result.success) {
 				setError(t.passwordTooShort);
