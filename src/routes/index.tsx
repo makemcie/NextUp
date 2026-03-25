@@ -56,6 +56,7 @@ import {
 	getMyRole,
 	getMyShop,
 	getRecoveryInfo,
+	sendRecoveryEmail,
 	getShopClients,
 	getShopQueues,
 	login,
@@ -154,6 +155,11 @@ function AuthScreen({
 		queryKey: ["recoveryInfo", recoveryEmail],
 		queryFn: () => getRecoveryInfo({ data: { email: recoveryEmail } }),
 		enabled: mode === "recovery" && recoverySearched && !!recoveryEmail,
+		onSuccess: (data) => {
+			if (data?.found) {
+				sendRecoveryEmail({ data: { email: recoveryEmail } }).catch(() => {});
+			}
+		},
 	});
 
 	const signupMutation = useMutation({
@@ -254,7 +260,32 @@ function AuthScreen({
 						<h1 className="text-2xl font-bold text-white">{t.recoveryTitle}</h1>
 					</div>
 
-					{recoveryQuery.isLoading ? (
+					{!recoverySearched ? (
+						<div className="space-y-4">
+							<p className="text-gray-400 text-sm text-center">
+								{lang === "es" ? "Ingresa tu correo para restablecer tu contraseña" : "Enter your email to reset your password"}
+							</p>
+							<input
+								type="email"
+								value={recoveryEmail}
+								onChange={(e) => setRecoveryEmail(e.target.value)}
+								placeholder={t.emailPlaceholder}
+								className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+								onKeyDown={(e) => { if (e.key === "Enter" && recoveryEmail.includes("@")) setRecoverySearched(true); }}
+							/>
+							<button
+								type="button"
+								onClick={() => setRecoverySearched(true)}
+								disabled={!recoveryEmail.includes("@")}
+								className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition-all"
+							>
+								{lang === "es" ? "Buscar cuenta" : "Find account"}
+							</button>
+							<button type="button" onClick={() => { setMode("login"); setError(""); setRecoveryEmail(""); setRecoverySearched(false); }} className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-gray-300 text-sm">
+								<ArrowLeft className="w-4 h-4" />{t.backToLogin}
+							</button>
+						</div>
+					) : recoveryQuery.isLoading ? (
 						<p className="text-gray-400 text-center py-8">{t.loading}</p>
 					) : recoveryQuery.data?.found ? (
 						resetDone ? (
