@@ -763,6 +763,7 @@ export const registerVisit = createServerFn({ method: "POST" })
 				name: data.name,
 				email: data.email,
 				lastVisitAt: now,
+				visitCount: (existingClient[0].visitCount ?? 0) + 1,
 			};
 			// Update SMS consent if client is giving new consent
 			if (data.smsConsented) {
@@ -789,6 +790,46 @@ export const registerVisit = createServerFn({ method: "POST" })
 			clientId = newClient[0].id;
 		}
 
+		// Check if client already has an active visit today (from appointment or previous QR scan)
+		const today = now.toISOString().split("T")[0];
+		const existingVisit = await (await db())
+			.select()
+			.from(visits)
+			.where(
+				and(
+					eq(visits.shopId, data.shopId),
+					eq(visits.clientId, clientId),
+					or(
+						eq(visits.status, "waiting"),
+						eq(visits.status, "called"),
+					),
+				),
+			)
+			.limit(1)
+			.all();
+
+		if (existingVisit[0]) {
+			// Client already in queue — return existing visit info
+			const queuePos = await (await db())
+				.select({ count: count() })
+				.from(visits)
+				.where(
+					and(
+						eq(visits.shopId, data.shopId),
+						eq(visits.status, "waiting"),
+						lte(visits.id, existingVisit[0].id),
+					),
+				)
+				.all();
+			return {
+				success: true,
+				alreadyInQueue: true,
+				visitId: existingVisit[0].id,
+				queuePosition: queuePos[0]?.count ?? 1,
+				message: "You are already in the queue for today.",
+			};
+		}
+
 		// Create visit (follow-up will be scheduled when completed)
 		const visit = await (await db())
 			.insert(visits)
@@ -801,31 +842,8 @@ export const registerVisit = createServerFn({ method: "POST" })
 			})
 			.returning();
 
-		// Send welcome SMS only if client consented AND Twilio is configured
-		let smsSent = false;
-		if (
-			data.smsConsented &&
-			shop.smsEnabled &&
-			shop.phone
-		) {
-			const welcomeText = (
-				shop.welcomeMessage ?? "Thanks for visiting! Please have a seat."
-			)
-				.replace("{nombre}", data.name)
-				.replace("{name}", data.name)
-				.replace("{barberia}", shop.name)
-				.replace("{shop}", shop.name);
-
-			const twilio = await getTwilioCreds();
-			const smsResult = await sendSMS({
-				to: data.phone,
-				body: welcomeText,
-				twilioSid: twilio.sid,
-				twilioToken: twilio.token,
-				twilioPhone: twilio.phone,
-			});
-			smsSent = smsResult.success;
-		}
+		// Welcome SMS disabled — client sees confirmation on the registration screen
+		const smsSent = false;
 
 		// Mark welcome as sent
 		await (await db())
@@ -1106,17 +1124,15 @@ export const processFollowUps = createServerFn({ method: "POST" }).handler(
 					shop.twilioPhone
 				) {
 					// Build follow-up message
-					let message = (
-						shop.followUpMessage ??
-						"Thanks for visiting! We'd love to hear your feedback."
-					)
-						.replace("{nombre}", client.name)
-						.replace("{name}", client.name)
-						.replace("{barberia}", shop.name)
-						.replace("{shop}", shop.name);
-
+					// Build follow-up message - keep under 160 chars per segment
+					let message = `Thanks for visiting ${shop.name}! Leave us a review:`;
 					if (shop.googleReviewLink) {
-						message += `\n\n⭐ Leave us a review here: ${shop.googleReviewLink}`;
+						message += ` ${shop.googleReviewLink}`;
+					}
+					message += " Reply STOP to opt out.";
+					// Truncate if over 160 chars
+					if (message.length > 160) {
+						message = `Thanks for visiting ${shop.name}! Reply STOP to opt out.`;
 					}
 
 					const twilioF = await getTwilioCreds();
@@ -1181,7 +1197,8 @@ export const processReminders = createServerFn({ method: "POST" }).handler(
 			// 1. Belong to this shop
 			// 2. Have SMS consent
 			// 3. Last visited more than X days ago
-			// 4. Haven't received a reminder recently (or ever)
+			// 4. Have more than 2 visits (loyalty filter)
+			// 5. Have NEVER received a reminder (only 1 reminder per client ever)
 			const inactiveClients = await (await db())
 				.select()
 				.from(clients)
@@ -1190,10 +1207,8 @@ export const processReminders = createServerFn({ method: "POST" }).handler(
 						eq(clients.shopId, shop.id),
 						eq(clients.smsConsented, true),
 						lte(clients.lastVisitAt, cutoffDate),
-						or(
-							isNull(clients.lastReminderSentAt),
-							lte(clients.lastReminderSentAt, reminderCooldown),
-						),
+						isNull(clients.lastReminderSentAt), // Never sent before = 0 reminders
+						gt(clients.visitCount, 2), // More than 2 visits
 					),
 				)
 				.limit(20)
@@ -1225,10 +1240,10 @@ export const processReminders = createServerFn({ method: "POST" }).handler(
 						totalErrors++;
 					}
 
-					// Mark reminder as sent regardless
+					// Mark reminder as sent — only 1 ever
 					await (await db())
 						.update(clients)
-						.set({ lastReminderSentAt: now })
+						.set({ lastReminderSentAt: now, reminderSentCount: 1 })
 						.where(eq(clients.id, client.id));
 				} catch {
 					totalErrors++;
@@ -1414,7 +1429,7 @@ export const callNextClient = createServerFn({ method: "POST" })
 
 		// Send SMS to client that their turn is ready
 		if (client[0]?.phone) {
-			sendSmsSafe(client[0].phone, `💈 ${barberInfo[0]?.name ?? "Your barber"} is ready for you at ${shopInfo[0]?.name ?? "the shop"}. Please come to the chair now!`).catch(() => {});
+			sendSmsSafe(client[0].phone, `${shopInfo[0]?.name ?? "Barbershop"}: It's your turn! Come to the chair now. Reply STOP to opt out.`).catch(() => {});
 		}
 
 		return { called: true, clientName: client[0]?.name ?? "" };
@@ -1745,7 +1760,7 @@ export const barberCallNext = createServerFn({ method: "POST" }).handler(
 			.all();
 
 		if (clientInfo[0]?.phone) {
-			sendSmsSafe(clientInfo[0].phone, `💈 ${barber[0].name} is ready for you at ${shopInfo2[0]?.name ?? "the shop"}. Please come to the chair now!`).catch(() => {});
+			sendSmsSafe(clientInfo[0].phone, `${shopInfo2[0]?.name ?? "Barbershop"}: It's your turn! Come to the chair now. Reply STOP to opt out.`).catch(() => {});
 		}
 
 		const client = await (await db())
@@ -1935,7 +1950,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 			},
 			body: new URLSearchParams({
 				"mode": "subscription",
-				"line_items[0][price]": "price_1TEK9I1NfybwCy3hbYZdnPwL",
+				"line_items[0][price]": "price_1TEpUE1NfybwCy3hLK4LwK6U",
 				"line_items[0][quantity]": "1",
 				"success_url": `${origin}/?payment=success&shopId=${shop[0].id}&session_id={CHECKOUT_SESSION_ID}`,
 				"cancel_url": `${origin}/?payment=cancelled`,
@@ -2636,4 +2651,82 @@ export const sendRecoveryEmail = createServerFn({ method: "POST" })
 		}).catch(() => {});
 
 		return { sent: true };
+	});
+
+// Auto-add appointments to queue when their time arrives
+export const processAppointmentsToQueue = createServerFn({ method: "POST" })
+	.handler(async () => {
+		const now = new Date();
+		const today = now.toISOString().split("T")[0];
+		const currentHour = now.getHours().toString().padStart(2, "0");
+		const currentMin = now.getMinutes().toString().padStart(2, "0");
+		const currentTime = `${currentHour}:${currentMin}`;
+
+		// Get appointments scheduled for now (within 5 min window)
+		const dueAppts = await (await db())
+			.select({
+				id: appointments.id,
+				shopId: appointments.shopId,
+				barberId: appointments.barberId,
+				clientId: appointments.clientId,
+				clientName: appointments.clientName,
+				clientPhone: appointments.clientPhone,
+				appointmentTime: appointments.appointmentTime,
+				visitId: appointments.visitId,
+			})
+			.from(appointments)
+			.where(
+				and(
+					eq(appointments.appointmentDate, today),
+					eq(appointments.status, "scheduled"),
+					isNull(appointments.visitId), // not yet added to queue
+					lte(appointments.appointmentTime, currentTime),
+				)
+			)
+			.all();
+
+		let added = 0;
+		for (const appt of dueAppts) {
+			// Create visit with priority (appointmentId links them)
+			const visit = await (await db())
+				.insert(visits)
+				.values({
+					shopId: appt.shopId,
+					clientId: appt.clientId ?? undefined,
+					barberId: appt.barberId,
+					status: "waiting",
+					welcomeSent: false,
+				})
+				.returning()
+				.all();
+
+			if (visit[0]) {
+				// Link appointment to visit
+				await (await db())
+					.update(appointments)
+					.set({ visitId: visit[0].id })
+					.where(eq(appointments.id, appt.id));
+
+				// SMS to client
+				const creds = await getTwilioCreds();
+				if (creds.sid && appt.clientPhone) {
+					const shopInfo = await (await db())
+						.select({ name: shops.name })
+						.from(shops)
+						.where(eq(shops.id, appt.shopId))
+						.limit(1)
+						.all();
+
+					await sendSMS({
+						to: appt.clientPhone,
+						body: `Hi ${appt.clientName}! Your appointment at ${shopInfo[0]?.name} has been added to the queue. Please check in when you arrive. 💈`,
+						...creds,
+					}).catch(() => {});
+				}
+
+				added++;
+			}
+		}
+
+		return { added };
 	});

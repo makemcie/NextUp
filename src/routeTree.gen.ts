@@ -9,19 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BizShopIdRouteImport } from './routes/biz/$shopId'
 import { Route as RegisterShopIdRouteImport } from './routes/register/$shopId'
 import { Route as QueueShopIdRouteImport } from './routes/queue/$shopId'
+import { Route as BizShopIdRouteImport } from './routes/biz/$shopId'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BizShopIdRoute = BizShopIdRouteImport.update({
-  id: '/biz/$shopId',
-  path: '/biz/$shopId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterShopIdRoute = RegisterShopIdRouteImport.update({
@@ -34,15 +41,24 @@ const QueueShopIdRoute = QueueShopIdRouteImport.update({
   path: '/queue/$shopId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BizShopIdRoute = BizShopIdRouteImport.update({
+  id: '/biz/$shopId',
+  path: '/biz/$shopId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/biz/$shopId': typeof BizShopIdRoute
   '/queue/$shopId': typeof QueueShopIdRoute
   '/register/$shopId': typeof RegisterShopIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/biz/$shopId': typeof BizShopIdRoute
   '/queue/$shopId': typeof QueueShopIdRoute
   '/register/$shopId': typeof RegisterShopIdRoute
@@ -50,20 +66,43 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/biz/$shopId': typeof BizShopIdRoute
   '/queue/$shopId': typeof QueueShopIdRoute
   '/register/$shopId': typeof RegisterShopIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/biz/$shopId' | '/queue/$shopId' | '/register/$shopId'
+  fullPaths:
+    | '/'
+    | '/privacy'
+    | '/terms'
+    | '/biz/$shopId'
+    | '/queue/$shopId'
+    | '/register/$shopId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/biz/$shopId' | '/queue/$shopId' | '/register/$shopId'
-  id: '__root__' | '/' | '/biz/$shopId' | '/queue/$shopId' | '/register/$shopId'
+  to:
+    | '/'
+    | '/privacy'
+    | '/terms'
+    | '/biz/$shopId'
+    | '/queue/$shopId'
+    | '/register/$shopId'
+  id:
+    | '__root__'
+    | '/'
+    | '/privacy'
+    | '/terms'
+    | '/biz/$shopId'
+    | '/queue/$shopId'
+    | '/register/$shopId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   BizShopIdRoute: typeof BizShopIdRoute
   QueueShopIdRoute: typeof QueueShopIdRoute
   RegisterShopIdRoute: typeof RegisterShopIdRoute
@@ -71,18 +110,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/biz/$shopId': {
-      id: '/biz/$shopId'
-      path: '/biz/$shopId'
-      fullPath: '/biz/$shopId'
-      preLoaderRoute: typeof BizShopIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register/$shopId': {
@@ -99,11 +145,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QueueShopIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/biz/$shopId': {
+      id: '/biz/$shopId'
+      path: '/biz/$shopId'
+      fullPath: '/biz/$shopId'
+      preLoaderRoute: typeof BizShopIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   BizShopIdRoute: BizShopIdRoute,
   QueueShopIdRoute: QueueShopIdRoute,
   RegisterShopIdRoute: RegisterShopIdRoute,

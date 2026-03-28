@@ -1,5 +1,42 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-weight: 300;
+  font-display: swap;
+  src: url('/pjs-300.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-weight: 400;
+  font-display: swap;
+  src: url('/pjs-400.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-weight: 500;
+  font-display: swap;
+  src: url('/pjs-500.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-weight: 600;
+  font-display: swap;
+  src: url('/pjs-600.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-weight: 700;
+  font-display: swap;
+  src: url('/pjs-700.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-weight: 800;
+  font-display: swap;
+  src: url('/pjs-800.ttf') format('truetype');
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -15,24 +52,15 @@ body {
   background: #070709;
   margin: 0;
   padding: 0;
-  min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* iPhone safe areas */
-body {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
 }
 
 #root {
-  min-height: 100vh;
   min-height: 100dvh;
   background: #070709;
 }
- 

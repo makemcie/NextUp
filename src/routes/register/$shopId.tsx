@@ -85,6 +85,7 @@ function RegisterPage() {
 		shopName: string | null;
 		queuePosition: number;
 		barberName: string;
+		alreadyInQueue?: boolean;
 	} | null>(null);
 
 	const mutation = useMutation({
@@ -100,7 +101,18 @@ function RegisterPage() {
 				},
 			}),
 		onSuccess: (data) => {
-			setResult(data);
+			if (data?.alreadyInQueue) {
+				// Client already in queue — show their position
+				setResult({
+					visitId: data.visitId,
+					shopName: shop?.name ?? null,
+					queuePosition: data.queuePosition ?? 1,
+					barberName: "",
+					alreadyInQueue: true,
+				});
+			} else {
+				setResult(data);
+			}
 			setStep(3);
 		},
 	});
@@ -441,6 +453,7 @@ function QueueConfirmation({
 
 	const currentPosition = posData?.position ?? result.queuePosition;
 	const isDone = posData === null;
+	const alreadyInQueue = (result as any).alreadyInQueue ?? false;
 
 	const [pulse, setPulse] = useState(false);
 	useEffect(() => {
@@ -532,7 +545,9 @@ function QueueConfirmation({
 			{/* Welcome Message */}
 			<div className="bg-gray-900/60 border border-gray-800/50 rounded-2xl p-5 max-w-sm w-full">
 				<p className="text-white leading-relaxed">
-					{result.welcomeMessage || t.defaultWelcome}
+					{alreadyInQueue
+				? (lang === "es" ? "Ya estás registrado en la cola de hoy. Esta es tu posición actual:" : "You're already registered in today's queue. This is your current position:")
+				: (result.welcomeMessage || t.defaultWelcome)}
 				</p>
 			</div>
 

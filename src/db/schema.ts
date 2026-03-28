@@ -100,6 +100,8 @@ export const clients = sqliteTable("clients", {
 	smsConsentedAt: integer("sms_consented_at", { mode: "timestamp" }),
 	lastVisitAt: integer("last_visit_at", { mode: "timestamp" }),
 	lastReminderSentAt: integer("last_reminder_sent_at", { mode: "timestamp" }),
+	reminderSentCount: integer("reminder_sent_count").notNull().default(0),
+	visitCount: integer("visit_count").notNull().default(0),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),

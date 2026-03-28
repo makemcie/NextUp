@@ -18,7 +18,7 @@ export async function sendSMS(params: {
 			},
 			body: new URLSearchParams({
 				To: params.to,
-				From: params.phone,
+				MessagingServiceSid: "MG98fb6d06baafedf41b9f6ddb16fe72f6",
 				Body: params.body,
 			}),
 		});

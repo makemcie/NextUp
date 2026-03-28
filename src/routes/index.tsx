@@ -83,6 +83,7 @@ import {
 	getAvailableSlots,
 	createAppointment,
 	processAppointmentReminders,
+	processAppointmentsToQueue,
 	requestCancelAppointment,
 	confirmCancelAppointment,
 	updateOwnerPhone,
@@ -335,168 +336,297 @@ function AuthScreen({
 
 	// ---- Signup / Login mode ----
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-			<div className="max-w-md w-full bg-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-2xl p-8 shadow-2xl">
-				<div className="flex justify-end mb-4">
-					<LangToggle lang={lang} setLang={setLang} />
-				</div>
-				<div className="text-center mb-6">
-					<div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-						<Scissors className="w-8 h-8 text-white" />
-					</div>
-					<h1 className="text-2xl font-bold text-white">Goolinext</h1>
-					<p className="text-gray-400 text-sm mt-2">{t.subtitle}</p>
-				</div>
+		<div style={{ background:"#050507", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif", position:"relative", overflowX:"hidden", minHeight:"100dvh" }}>
+			<style>{`
+				/* Responsive */
+				@media(max-width:768px){
+					.lhero{padding:56px 20px 48px!important}
+					.a4{flex-direction:column!important;align-items:stretch!important}
+					.a4 button{width:100%!important;text-align:center!important}
+					.lstats{gap:28px!important}
+					.lfeat-grid{grid-template-columns:1fr!important}
+					.lfeat-card{flex-direction:column!important;gap:14px!important}
+					.lsteps{grid-template-columns:1fr 1fr!important}
+					.lprice-grid{grid-template-columns:1fr!important}
+					.lprice-box{padding:32px 20px!important}
+					.lauth-box{padding:28px 20px!important}
+				}
+				@media(max-width:480px){
+					.lsteps{grid-template-columns:1fr!important}
+					.lstats{gap:20px!important;justify-content:center!important}
+				}
+				*{box-sizing:border-box}
+				@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.5)}}
+				@keyframes fade-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+				.a1{animation:fade-up 0.5s ease both}
+				.a2{animation:fade-up 0.5s 0.07s ease both}
+				.a3{animation:fade-up 0.5s 0.14s ease both}
+				.a4{animation:fade-up 0.5s 0.21s ease both}
+				.a5{animation:fade-up 0.5s 0.28s ease both}
+				.lfc{transition:transform 0.25s,border-color 0.25s}
+				.lfc:hover{transform:translateY(-4px);border-color:rgba(249,115,22,0.3)!important}
+				.lgb{transition:box-shadow 0.2s,transform 0.15s;cursor:pointer}
+				.lgb:hover{box-shadow:0 0 40px rgba(249,115,22,0.4)!important;transform:translateY(-1px)}
+				input:-webkit-autofill{-webkit-box-shadow:0 0 0 30px #0a0a10 inset!important;-webkit-text-fill-color:white!important}
+			`}</style>
 
-				{/* Tab switcher */}
-				<div className="flex gap-1 bg-gray-800 p-1 rounded-xl mb-6">
-					<button
-						type="button"
-						onClick={() => {
-							setMode("signup");
-							setError("");
-						}}
-						className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-							mode === "signup"
-								? "bg-amber-500/20 text-amber-400"
-								: "text-gray-400 hover:text-gray-300"
-						}`}
-					>
-						<User className="w-4 h-4" />
-						{t.createAccount}
-					</button>
-					<button
-						type="button"
-						onClick={() => {
-							setMode("login");
-							setError("");
-						}}
-						className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-							mode === "login"
-								? "bg-amber-500/20 text-amber-400"
-								: "text-gray-400 hover:text-gray-300"
-						}`}
-					>
-						<Lock className="w-4 h-4" />
-						{t.signIn}
-					</button>
-				</div>
+			{/* Background grid */}
+			<div style={{ position:"fixed", inset:0, backgroundImage:"linear-gradient(rgba(249,115,22,0.035) 1px,transparent 1px),linear-gradient(90deg,rgba(249,115,22,0.035) 1px,transparent 1px)", backgroundSize:"54px 54px", pointerEvents:"none", zIndex:0 }} />
+			<div style={{ position:"fixed", top:0, left:0, right:0, height:650, background:"radial-gradient(ellipse 100% 60% at 50% -10%,rgba(249,115,22,0.1) 0%,transparent 70%)", pointerEvents:"none", zIndex:0 }} />
 
-				<div className="space-y-4">
-					<div>
-						<label
-							htmlFor="auth-email"
-							className="block text-sm font-medium text-gray-300 mb-1"
-						>
-							<span className="flex items-center gap-1.5">
-								<Mail className="w-3.5 h-3.5" />
-								{t.email}
-							</span>
-						</label>
-						<input
-							id="auth-email"
-							type="email"
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
-							placeholder={t.emailPlaceholder}
-							className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-							onKeyDown={(e) => {
-								if (e.key === "Enter") handleSubmit();
-							}}
-						/>
-					</div>
-					<div>
-						<label
-							htmlFor="auth-password"
-							className="block text-sm font-medium text-gray-300 mb-1"
-						>
-							<span className="flex items-center gap-1.5">
-								<Lock className="w-3.5 h-3.5" />
-								{t.password}
-							</span>
-						</label>
-						<input
-							id="auth-password"
-							type="password"
-							value={password}
-							onChange={(e) => setPassword(e.target.value)}
-							placeholder={t.passwordPlaceholder}
-							className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-							onKeyDown={(e) => {
-								if (e.key === "Enter") handleSubmit();
-							}}
-						/>
-					</div>
-					{mode === "signup" && (
-						<div>
-							<label
-								htmlFor="auth-confirm"
-								className="block text-sm font-medium text-gray-300 mb-1"
-							>
-								<span className="flex items-center gap-1.5">
-									<Shield className="w-3.5 h-3.5" />
-									{t.confirmPassword}
-								</span>
-							</label>
-							<input
-								id="auth-confirm"
-								type="password"
-								value={confirmPassword}
-								onChange={(e) => setConfirmPassword(e.target.value)}
-								placeholder={t.confirmPasswordPlaceholder}
-								className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-								onKeyDown={(e) => {
-									if (e.key === "Enter") handleSubmit();
-								}}
-							/>
+			{/* NAV */}
+			<nav style={{ position:"sticky", top:0, zIndex:50, borderBottom:"1px solid rgba(255,255,255,0.06)", background:"rgba(5,5,7,0.88)", backdropFilter:"blur(18px)" }}>
+				<div style={{ maxWidth:1100, margin:"0 auto", padding:"0 24px", height:62, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+					<div style={{ display:"flex", alignItems:"center", gap:10 }}>
+						<div style={{ width:36, height:36, background:"linear-gradient(135deg,#f97316,#c2410c)", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 14px rgba(249,115,22,0.3)" }}>
+							<span style={{ fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif", fontWeight:800, fontSize:19, color:"white" }}>G</span>
 						</div>
-					)}
+						<span style={{ fontWeight:800, fontSize:19, color:"white", letterSpacing:"-0.5px" }}>Goolinext</span>
+					</div>
+					<div style={{ display:"flex", gap:10, alignItems:"center" }}>
+						<LangToggle lang={lang} setLang={setLang} />
+						<button type="button" onClick={() => { setMode("login"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"7px 18px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:9, color:"#94a3b8", fontSize:13, fontWeight:500, cursor:"pointer", fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
+							{lang === "es" ? "Iniciar sesión" : "Sign in"}
+						</button>
+						<button type="button" className="lgb" onClick={() => { setMode("signup"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"7px 18px", background:"linear-gradient(135deg,#f97316,#ea580c)", border:"none", borderRadius:9, color:"white", fontSize:13, fontWeight:700, boxShadow:"0 4px 14px rgba(249,115,22,0.25)", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
+							{lang === "es" ? "Empezar" : "Get started"}
+						</button>
+					</div>
+				</div>
+			</nav>
 
-					{error && <p className="text-red-400 text-sm text-center">{error}</p>}
-
-					<button
-						type="button"
-						onClick={handleSubmit}
-						disabled={isPending}
-						className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-					>
-						{isPending
-							? mode === "signup"
-								? t.creating
-								: t.signingIn
-							: mode === "signup"
-								? t.createAccount
-								: t.signIn}
+			{/* HERO */}
+			<section style={{ position:"relative", zIndex:1, maxWidth:1100, margin:"0 auto", padding:"96px 24px 80px", textAlign:"center" }}>
+				<div className="a1" style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"5px 16px", background:"rgba(249,115,22,0.08)", border:"1px solid rgba(249,115,22,0.2)", borderRadius:100, marginBottom:28 }}>
+					<div style={{ width:6, height:6, borderRadius:"50%", background:"#f97316", animation:"pulse-dot 1.8s ease infinite" }} />
+					<span style={{ color:"#f97316", fontSize:11, fontWeight:700, letterSpacing:"0.1em" }}>{lang === "es" ? "LA PLATAFORMA #1 PARA BARBERÍAS" : "THE #1 BARBERSHOP MANAGEMENT PLATFORM"}</span>
+				</div>
+				<h1 className="a2" style={{ fontSize:"clamp(44px,7vw,82px)", fontWeight:800, color:"white", lineHeight:1.02, letterSpacing:"-3px", margin:"0 0 22px" }}>
+					{lang === "es" ? "Tu Barbería," : "Your Barbershop,"}<br/>
+					<span style={{ background:"linear-gradient(135deg,#f97316 20%,#fbbf24 80%)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+						{lang === "es" ? "Completamente Automatizada." : "Fully Automated."}
+					</span>
+				</h1>
+				<p className="a3" style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:"clamp(15px,2vw,18px)", color:"#64748b", maxWidth:600, margin:"0 auto 48px", lineHeight:1.8, fontWeight:300 }}>
+					{lang === "es"
+						? "Deja de perder clientes por la desorganización. Goolinext le da a tu barbería una cola virtual, citas automatizadas, SMS instantáneos y una presencia online profesional — para que te enfoques en lo que mejor sabes hacer."
+						: "Stop losing clients to disorganization. Goolinext gives your barbershop a virtual queue, automated appointments, instant SMS and a professional online presence — so you can focus on what you do best."}
+				</p>
+				<div className="a4 lbtn-row" style={{ display:"flex", gap:14, justifyContent:"center", flexWrap:"wrap", marginBottom:60 }}>
+					<button type="button" className="lgb" onClick={() => { setMode("signup"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"16px 40px", background:"linear-gradient(135deg,#f97316,#ea580c)", border:"none", borderRadius:12, color:"white", fontSize:16, fontWeight:700, boxShadow:"0 8px 28px rgba(249,115,22,0.3)", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
+						{lang === "es" ? "Empezar ahora — $150/mes" : "Start now — $150/mo"}
 					</button>
+					<button type="button" onClick={() => { setMode("login"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"16px 40px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:12, color:"#94a3b8", fontSize:16, fontWeight:600, cursor:"pointer", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
+						{lang === "es" ? "Ya tengo cuenta" : "I already have an account"}
+					</button>
+				</div>
+				<div className="a5 lstats" style={{ display:"flex", gap:52, justifyContent:"center", flexWrap:"wrap" }}>
+					{[["100%", lang === "es" ? "Automatizado" : "Automated"],["24/7", lang === "es" ? "En línea" : "Online"],["∞", lang === "es" ? "Clientes" : "Clients"],["$0", lang === "es" ? "Sin setup" : "Setup fee"]].map(([n,l],i) => (
+						<div key={i} style={{ textAlign:"center" }}>
+							<p style={{ fontSize:30, fontWeight:800, color:"white", lineHeight:1 }}>{n}</p>
+							<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:12, color:"#475569", marginTop:6 }}>{l}</p>
+						</div>
+					))}
+				</div>
+			</section>
 
-					{mode === "login" && (
-						<button
-							type="button"
-							onClick={() => {
-								setMode("recovery");
-								setError("");
-							}}
-							className="w-full text-center text-amber-400/70 hover:text-amber-400 text-sm transition-colors"
-						>
-							{t.forgotPassword}
-						</button>
-					)}
-
-					<p className="text-center text-gray-500 text-sm">
-						{mode === "signup" ? t.haveAccount : t.noAccount}{" "}
-						<button
-							type="button"
-							onClick={() => {
-								setMode(mode === "signup" ? "login" : "signup");
-								setError("");
-							}}
-							className="text-amber-400 hover:text-amber-300 font-medium"
-						>
-							{mode === "signup" ? t.signIn : t.createAccount}
-						</button>
+			{/* FEATURES 2x3 */}
+			<section style={{ position:"relative", zIndex:1, maxWidth:1100, margin:"0 auto", padding:"72px 24px" }}>
+				<div style={{ textAlign:"center", marginBottom:56 }}>
+					<h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:800, color:"white", letterSpacing:"-2px", margin:"0 0 14px" }}>
+						{lang === "es" ? "Un sistema. Control total." : "One system. Total control."}
+					</h2>
+					<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#475569", fontSize:16, maxWidth:480, margin:"0 auto" }}>
+						{lang === "es" ? "Todo lo que necesitas para manejar una barbería moderna — sin la complejidad." : "Every tool you need to run a modern barbershop — without the complexity."}
 					</p>
 				</div>
-			</div>
+				<div className="lfeat-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,320px),1fr))", gap:20 }}>
+					{[
+						{
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
+							tag: lang === "es" ? "SIN CONFUSIÓN EN LA ESPERA" : "ZERO WAIT CONFUSION",
+							title: lang === "es" ? "Cola Virtual Inteligente" : "Smart Virtual Queue",
+							desc: lang === "es" ? "Los clientes escanean tu QR, se unen desde el teléfono, ven su espera en vivo y reciben un SMS cuando es su turno. Sin salas llenas ni llamadas perdidas." : "Clients scan your QR, join from their phone, see wait time live and get an SMS when it's their turn. No crowded waiting rooms or missed calls.",
+						},
+						{
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="1" fill="#f97316"/><circle cx="12" cy="15" r="1" fill="#f97316"/><circle cx="16" cy="15" r="1" fill="#f97316"/></svg>,
+							tag: lang === "es" ? "RESERVA MIENTRAS DUERMES" : "BOOKS WHILE YOU SLEEP",
+							title: lang === "es" ? "Sistema de Citas Completo" : "Appointment System",
+							desc: lang === "es" ? "Tu página reserva citas las 24 horas. El cliente elige barbero, fecha y hora. El barbero recibe SMS al instante. Las cancelaciones pasan por aprobación del dueño." : "Your page books appointments 24/7. Client picks barber, date and time. Barber gets instant SMS. Cancel requests go through owner approval.",
+						},
+						{
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+							tag: lang === "es" ? "CONVIERTE VISITAS EN LEALTAD" : "TURN VISITS INTO LOYALTY",
+							title: lang === "es" ? "SMS Automáticos 24/7" : "Automatic SMS Engine",
+							desc: lang === "es" ? "Confirmación de cita, recordatorio 2 horas antes, aviso de turno, agradecimiento post-visita con link de Google Review y mensaje de retorno a los 30 días — todo automático." : "Booking confirmation, 2-hour reminder, turn alert, post-visit thank you with Google review link, and 30-day win-back message — all automatic.",
+						},
+						{
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+							tag: lang === "es" ? "TU TIENDA DIGITAL" : "YOUR DIGITAL STOREFRONT",
+							title: lang === "es" ? "Página Pública Profesional" : "Professional Public Page",
+							desc: lang === "es" ? "Página premium con tu equipo, horarios, ubicación y botón de reserva. Compártela en Google Business, Instagram o WhatsApp. Los clientes te encuentran y reservan sin llamarte." : "Premium page with your team, hours, location and booking button. Share on Google Business, Instagram or WhatsApp. Clients find you and book without calling.",
+						},
+						{
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+							tag: lang === "es" ? "VISIBILIDAD TOTAL DEL DUEÑO" : "FULL OWNER VISIBILITY",
+							title: lang === "es" ? "Portal de Empleados" : "Team Management Portal",
+							desc: lang === "es" ? "Cada barbero tiene su propio login y ve solo su cola. Tú ves todo — cada barbero, cada cliente, cada servicio. Transparencia total sin micromanagement." : "Each barber logs in and sees only their queue. You see everything — every barber, every client, every service. Total transparency, zero micromanagement.",
+						},
+						{
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+							tag: lang === "es" ? "TU ACTIVO MÁS VALIOSO" : "YOUR MOST VALUABLE ASSET",
+							title: lang === "es" ? "Base de Datos de Clientes" : "Client Database",
+							desc: lang === "es" ? "Cada cliente guardado automáticamente con nombre, teléfono e historial. Exporta a CSV en cualquier momento. Sabe quiénes son tus mejores clientes y haz crecer tu negocio." : "Every client auto-saved with name, phone and visit history. Export to CSV anytime. Know your best clients and grow your business intelligently.",
+						},
+					].map((f, i) => (
+						<div key={i} className="lfc lfeat-card" style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:20, padding:"30px 28px", display:"flex", gap:20, alignItems:"flex-start" }}>
+							<div style={{ width:52, height:52, minWidth:52, background:"rgba(249,115,22,0.08)", border:"1px solid rgba(249,115,22,0.15)", borderRadius:14, display:"flex", alignItems:"center", justifyContent:"center" }}>{f.svg}</div>
+							<div>
+								<span style={{ display:"inline-block", padding:"2px 10px", background:"rgba(249,115,22,0.08)", border:"1px solid rgba(249,115,22,0.15)", borderRadius:100, marginBottom:8 }}>
+									<span style={{ color:"#f97316", fontSize:10, fontWeight:700, letterSpacing:"0.06em" }}>{f.tag}</span>
+								</span>
+								<h3 style={{ fontSize:18, fontWeight:800, color:"white", margin:"0 0 8px", letterSpacing:"-0.4px" }}>{f.title}</h3>
+								<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:13, color:"#475569", lineHeight:1.75, margin:0 }}>{f.desc}</p>
+							</div>
+						</div>
+					))}
+				</div>
+			</section>
+
+			{/* HOW IT WORKS */}
+			<section style={{ position:"relative", zIndex:1, background:"rgba(249,115,22,0.025)", borderTop:"1px solid rgba(249,115,22,0.07)", borderBottom:"1px solid rgba(249,115,22,0.07)", padding:"72px 24px" }}>
+				<div style={{ maxWidth:1100, margin:"0 auto" }}>
+					<div style={{ textAlign:"center", marginBottom:56 }}>
+						<h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:800, color:"white", letterSpacing:"-2px", margin:"0 0 12px" }}>
+							{lang === "es" ? "Funcionando en minutos." : "Up and running in minutes."}
+						</h2>
+						<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#475569", fontSize:16 }}>
+							{lang === "es" ? "Sin conocimientos técnicos. Sin configuraciones complicadas. Solo resultados." : "No technical knowledge needed. No complicated setup. Just results."}
+						</p>
+					</div>
+					<div className="lsteps" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))", gap:28 }}>
+						{[
+							["01", lang === "es" ? "Crea tu cuenta" : "Create your account", lang === "es" ? "Regístrate con tu email en 2 minutos. Agrega el nombre, dirección y horarios de tu barbería." : "Sign up with your email in 2 minutes. Add your barbershop name, address and hours."],
+							["02", lang === "es" ? "Configura tu equipo" : "Set up your team", lang === "es" ? "Agrega cada barbero con su nombre, teléfono y código de acceso único." : "Add each barber with their name, phone and unique login code."],
+							["03", lang === "es" ? "Sal en vivo al instante" : "Go live instantly", lang === "es" ? "Tu página pública y código QR están listos. Comparte el link — los clientes reservan de inmediato." : "Your public page and QR code are ready. Share the link — clients book immediately."],
+							["04", lang === "es" ? "Goolinext hace el resto" : "Goolinext does the rest", lang === "es" ? "El sistema maneja la cola, las citas, los recordatorios y el seguimiento automáticamente." : "The system handles the queue, appointments, reminders and follow-ups automatically."],
+						].map(([step,title,desc],i) => (
+							<div key={i}>
+								<div style={{ fontSize:52, fontWeight:800, color:"rgba(249,115,22,0.12)", lineHeight:1, marginBottom:8, letterSpacing:"-2px" }}>{step}</div>
+								<h3 style={{ fontSize:16, fontWeight:700, color:"white", margin:"0 0 8px" }}>{title}</h3>
+								<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:13, color:"#475569", lineHeight:1.7 }}>{desc}</p>
+							</div>
+						))}
+					</div>
+				</div>
+			</section>
+
+			{/* PRICING */}
+			<section style={{ position:"relative", zIndex:1, maxWidth:680, margin:"0 auto", padding:"80px 24px", textAlign:"center" }}>
+				<h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:800, color:"white", letterSpacing:"-2px", margin:"0 0 12px" }}>
+					{lang === "es" ? "Un plan. Todo incluido." : "One plan. Everything included."}
+				</h2>
+				<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#475569", fontSize:16, marginBottom:44 }}>
+					{lang === "es" ? "Sin costos ocultos. Sin límites. Sin compromisos a largo plazo." : "No hidden fees. No feature limits. No long-term commitment."}
+				</p>
+				<div className="lprice-box" style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(249,115,22,0.18)", borderRadius:24, padding:"48px 40px", position:"relative", overflow:"hidden" }}>
+					<div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse at 50% -20%,rgba(249,115,22,0.07) 0%,transparent 60%)" }} />
+					<div style={{ position:"relative" }}>
+						<div style={{ display:"inline-block", padding:"4px 14px", background:"rgba(249,115,22,0.1)", border:"1px solid rgba(249,115,22,0.2)", borderRadius:100, marginBottom:20 }}>
+							<span style={{ color:"#f97316", fontSize:11, fontWeight:700, letterSpacing:"0.1em" }}>GOOLINEXT PRO</span>
+						</div>
+						<div style={{ marginBottom:32 }}>
+							<span style={{ fontSize:68, fontWeight:800, color:"white", letterSpacing:"-3px", lineHeight:1 }}>$150</span>
+							<span style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:17, color:"#475569" }}>{lang === "es" ? " / mes" : " / month"}</span>
+						</div>
+						<div className="lprice-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,180px),1fr))", gap:"10px 24px", textAlign:"left", maxWidth:440, margin:"0 auto 40px" }}>
+							{[
+								lang === "es" ? "Cola virtual ilimitada" : "Unlimited virtual queue",
+								lang === "es" ? "Sistema de citas completo" : "Full appointment system",
+								lang === "es" ? "SMS automáticos a clientes" : "Automatic SMS to clients",
+								lang === "es" ? "SMS a barberos y dueño" : "SMS to barbers and owner",
+								lang === "es" ? "Página pública profesional" : "Professional public page",
+								lang === "es" ? "Portal individual por barbero" : "Individual barber portals",
+								lang === "es" ? "Base de clientes y CSV" : "Client database and CSV",
+								lang === "es" ? "Generador de código QR" : "QR code generator",
+								lang === "es" ? "Soporte prioritario WhatsApp" : "WhatsApp priority support",
+								lang === "es" ? "Barberos y clientes ilimitados" : "Unlimited barbers and clients",
+							].map((item,i) => (
+								<p key={i} style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:13, color:"#64748b", display:"flex", alignItems:"center", gap:8, margin:0 }}>
+									<span style={{ color:"#f97316" }}>✓</span>{item}
+								</p>
+							))}
+						</div>
+						<button type="button" className="lgb" onClick={() => { setMode("signup"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"17px 56px", background:"linear-gradient(135deg,#f97316,#ea580c)", border:"none", borderRadius:13, color:"white", fontSize:17, fontWeight:700, boxShadow:"0 8px 28px rgba(249,115,22,0.3)", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
+							{lang === "es" ? "Empezar ahora" : "Get started now"}
+						</button>
+						<div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, marginTop:20, padding:"12px 24px", background:"rgba(34,197,94,0.06)", border:"1px solid rgba(34,197,94,0.15)", borderRadius:12, flexWrap:"wrap" }}>
+							<span style={{ fontSize:18 }}>🛡️</span>
+							<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#4ade80", fontSize:13, fontWeight:600, margin:0 }}>
+								{lang === "es" ? "Garantía de 7 días — Si no estás satisfecho, te devolvemos tu dinero sin preguntas." : "7-Day Money-Back Guarantee — Not satisfied? Full refund, no questions asked."}
+								{" "}<a href="/terms" style={{ color:"#86efac", fontSize:12, textDecoration:"underline" }}>{lang === "es" ? "Ver política" : "See policy"}</a>
+							</p>
+						</div>
+						<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#334155", fontSize:12, marginTop:12 }}>
+							{lang === "es" ? "Sin tarjeta de crédito para registrarse · Cancela cuando quieras" : "No credit card required to sign up · Cancel anytime"}
+						</p>
+					</div>
+				</div>
+			</section>
+
+			{/* AUTH FORM */}
+			<section id="goolinext-auth" style={{ position:"relative", zIndex:1, maxWidth:440, margin:"0 auto", padding:"0 24px 88px" }}>
+				<div className="lauth-box" style={{ background:"rgba(10,10,16,0.98)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:22, padding:"38px 34px" }}>
+					<div style={{ textAlign:"center", marginBottom:26 }}>
+						<div style={{ width:52, height:52, background:"linear-gradient(135deg,#f97316,#c2410c)", borderRadius:15, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px", boxShadow:"0 6px 20px rgba(249,115,22,0.25)" }}>
+							<span style={{ fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif", fontWeight:800, fontSize:24, color:"white" }}>G</span>
+						</div>
+						<h2 style={{ fontSize:22, fontWeight:800, color:"white", letterSpacing:"-0.5px", margin:"0 0 5px" }}>
+							{mode === "signup" ? (lang === "es" ? "Crear tu cuenta" : "Create your account") : (lang === "es" ? "Iniciar sesión" : "Sign in")}
+						</h2>
+						<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#475569", fontSize:13 }}>
+							{lang === "es" ? "Únete a las barberías que ya usan Goolinext" : "Join barbershops already using Goolinext"}
+						</p>
+					</div>
+					<div style={{ display:"flex", gap:4, background:"rgba(255,255,255,0.04)", padding:4, borderRadius:12, marginBottom:22 }}>
+						<button type="button" onClick={() => { setMode("signup"); setError(""); }} style={{ flex:1, padding:10, borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif", background: mode === "signup" ? "linear-gradient(135deg,#f97316,#ea580c)" : "transparent", color: mode === "signup" ? "white" : "#475569", transition:"all 0.2s" }}>
+							{lang === "es" ? "Registrarse" : "Sign up"}
+						</button>
+						<button type="button" onClick={() => { setMode("login"); setError(""); }} style={{ flex:1, padding:10, borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif", background: mode === "login" ? "linear-gradient(135deg,#f97316,#ea580c)" : "transparent", color: mode === "login" ? "white" : "#475569", transition:"all 0.2s" }}>
+							{lang === "es" ? "Iniciar sesión" : "Sign in"}
+						</button>
+					</div>
+					<div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+						<input id="auth-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.emailPlaceholder} style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:11, color:"white", fontSize:14, fontFamily:"'Plus Jakarta Sans',sans-serif", outline:"none" }} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} />
+						<input id="auth-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t.passwordPlaceholder} style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:11, color:"white", fontSize:14, fontFamily:"'Plus Jakarta Sans',sans-serif", outline:"none" }} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} />
+						{mode === "signup" && (
+							<input id="auth-confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t.confirmPasswordPlaceholder} style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:11, color:"white", fontSize:14, fontFamily:"'Plus Jakarta Sans',sans-serif", outline:"none" }} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} />
+						)}
+						{error && <p style={{ color:"#f87171", fontSize:13, textAlign:"center", margin:0 }}>{error}</p>}
+						<button type="button" className="lgb" onClick={handleSubmit} disabled={isPending} style={{ width:"100%", padding:15, background: isPending ? "#92400e" : "linear-gradient(135deg,#f97316,#ea580c)", border:"none", borderRadius:12, color:"white", fontSize:15, fontWeight:700, cursor: isPending ? "not-allowed" : "pointer", boxShadow:"0 6px 22px rgba(249,115,22,0.28)", marginTop:2, fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
+							{isPending ? (mode === "signup" ? t.creating : t.signingIn) : (mode === "signup" ? (lang === "es" ? "Crear mi cuenta →" : "Create my account →") : t.signIn)}
+						</button>
+						{mode === "login" && (
+							<button type="button" onClick={() => { setMode("recovery"); setError(""); }} style={{ background:"none", border:"none", color:"#f97316", fontSize:13, cursor:"pointer", fontFamily:"'Plus Jakarta Sans',sans-serif", textDecoration:"underline" }}>
+								{t.forgotPassword}
+							</button>
+						)}
+						<p style={{ textAlign:"center", color:"#334155", fontSize:12, margin:0, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
+							{mode === "signup" ? t.haveAccount : t.noAccount}{" "}
+							<button type="button" onClick={() => { setMode(mode === "signup" ? "login" : "signup"); setError(""); }} style={{ background:"none", border:"none", color:"#f97316", fontSize:13, cursor:"pointer", fontWeight:600, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
+								{mode === "signup" ? t.signIn : t.createAccount}
+							</button>
+						</p>
+					</div>
+				</div>
+			</section>
+
+			{/* FOOTER */}
+			<footer style={{ position:"relative", zIndex:1, borderTop:"1px solid rgba(255,255,255,0.05)", padding:"30px 24px", textAlign:"center" }}>
+				<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#1e293b", fontSize:12 }}>
+					© 2025 Goolinext · {lang === "es" ? "Todos los derechos reservados" : "All rights reserved"} · <a href="/privacy" style={{ color:"#334155", textDecoration:"none" }}>Privacy</a> · <a href="/terms" style={{ color:"#334155", textDecoration:"none" }}>Terms</a>
+				</p>
+			</footer>
 		</div>
 	);
 }
@@ -868,9 +998,10 @@ function Dashboard({
 		const run = () => {
 			processReminders().catch(() => {});
 			processAppointmentReminders().catch(() => {});
+			processAppointmentsToQueue().catch(() => {});
 		};
 		run();
-		const interval = setInterval(run, 30 * 60 * 1000);
+		const interval = setInterval(run, 5 * 60 * 1000); // every 5 min for queue
 		return () => clearInterval(interval);
 	}, []);
 
@@ -880,9 +1011,9 @@ function Dashboard({
 		{ key: "barbers" as const, label: t.tabBarbers, icon: Scissors },
 		{ key: "qr" as const, label: t.tabQR, icon: QrCode },
 		{ key: "clients" as const, label: t.tabClients, icon: Database },
-		{ key: "settings" as const, label: t.tabSettings, icon: Settings },
 		{ key: "appointments" as const, label: lang === "es" ? `Citas${pendingCancels > 0 ? ` (${pendingCancels})` : ""}` : `Appts${pendingCancels > 0 ? ` (${pendingCancels})` : ""}`, icon: CalendarCheck },
 		{ key: "help" as const, label: lang === "es" ? "Ayuda" : "Help", icon: Bell },
+		{ key: "settings" as const, label: t.tabSettings, icon: Settings },
 	];
 
 	// Show paywall if not subscribed (only when we have definitive data)
@@ -2552,6 +2683,10 @@ function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () =
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 
+	const handleLogout = async () => {
+		try { await logout(); } catch {} finally { window.location.reload(); }
+	};
+
 	const handleSubscribe = async () => {
 		try {
 			setLoading(true);
@@ -2606,7 +2741,7 @@ function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () =
 
 				{/* Price */}
 				<div style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.25)", borderRadius: 16, padding: "16px", marginBottom: 20 }}>
-					<p style={{ fontSize: "2rem", fontWeight: 800, color: "white", margin: 0 }}>$74<span style={{ fontSize: "1rem", color: "#64748b", fontWeight: 400 }}>/mo</span></p>
+					<p style={{ fontSize: "2rem", fontWeight: 800, color: "white", margin: 0 }}>$150<span style={{ fontSize: "1rem", color: "#64748b", fontWeight: 400 }}>/mo</span></p>
 					<p style={{ color: "#f97316", fontSize: 12, marginTop: 4 }}>{lang === "es" ? "Todo incluido · Sin contratos" : "All included · No contracts"}</p>
 				</div>
 
@@ -2618,11 +2753,25 @@ function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () =
 					disabled={loading}
 					style={{ width: "100%", padding: "16px", background: loading ? "#92400e" : "linear-gradient(135deg, #f97316, #ea580c)", color: "white", fontWeight: 700, fontSize: 16, border: "none", borderRadius: 14, cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 8px 30px rgba(249,115,22,0.35)" }}
 				>
-					{loading ? "..." : (lang === "es" ? "🚀 Activar por $74/mes" : "🚀 Activate for $74/mo")}
+					{loading ? "..." : (lang === "es" ? "🚀 Activar por $150/mes" : "🚀 Activate for $150/mo")}
 				</button>
 				<p style={{ color: "#334155", fontSize: 11, marginTop: 12 }}>
 					{lang === "es" ? "Pago seguro vía Stripe · Cancela cuando quieras" : "Secure payment via Stripe · Cancel anytime"}
 				</p>
+				<div style={{ marginTop: 16, padding: "10px 16px", background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 12, display: "flex", alignItems: "center", gap: 8 }}>
+					<span style={{ fontSize: 16 }}>🛡️</span>
+					<p style={{ color: "#4ade80", fontSize: 12, fontWeight: 600, margin: 0 }}>
+						{lang === "es" ? "Garantía de devolución de 7 días — sin preguntas." : "7-Day Money-Back Guarantee — no questions asked."}
+						{" "}<a href="/terms" style={{ color:"#86efac", fontSize:11, textDecoration:"underline" }}>{lang === "es" ? "Ver política" : "See policy"}</a>
+					</p>
+				</div>
+				<button
+					type="button"
+					onClick={handleLogout}
+					style={{ marginTop: 16, background: "none", border: "none", color: "#475569", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}
+				>
+					{lang === "es" ? "Cerrar sesión" : "Sign out"}
+				</button>
 			</div>
 		</div>
 	);
