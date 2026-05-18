@@ -3848,18 +3848,20 @@ function ReputationView({ shop, lang }: { shop: any; lang: Lang }) {
 	// Coordenadas del cuadro blanco con borde dorado
 	const QR_BOX = {
 		left: 240,
-		top: 340,
+		top: 520,
 		width: 606,
-		height: 606,
+		height: 430,
 	};
 
 	// Margen interior para que el QR no toque los bordes
-	const QR_MARGIN = 30;
+	const QR_MARGIN = 60;
 
-	// Calcular posición y tamaño del QR dentro del cuadro
-	const qrSize = QR_BOX.width - (QR_MARGIN * 2);
-	const qrX = QR_BOX.left + QR_MARGIN;
-	const qrY = QR_BOX.top + QR_MARGIN;
+	// QR CODE: 41% del área blanca (MÁS PEQUEÑO)
+	// 41% de 1023 = 420px (un chin más pequeño)
+	// Centrado en la misma posición
+	const qrSize = 420;
+	const qrX = QR_BOX.left + (QR_BOX.width - qrSize) / 2;
+	const qrY = QR_BOX.top + (QR_BOX.height - qrSize) / 2 + 70;
 
 	// Dibujar el QR centrado en el cuadro blanco
 	ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
