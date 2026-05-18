@@ -3808,151 +3808,69 @@ function ReputationView({ shop, lang }: { shop: any; lang: Lang }) {
 	});
 
 	const downloadQR = async () => {
-		const W = 800, H = 1000;
-		const canvas = document.createElement("canvas");
-		canvas.width = W; canvas.height = H;
-		const ctx = canvas.getContext("2d")!;
+	// Dimensiones de la imagen original
+	const IMG_WIDTH = 1086;
+	const IMG_HEIGHT = 1448;
 
-		// --- Background: white ---
-		ctx.fillStyle = "#FFFFFF";
-		ctx.fillRect(0, 0, W, H);
+	// Crear canvas con las mismas dimensiones que la imagen original
+	const canvas = document.createElement("canvas");
+	canvas.width = IMG_WIDTH;
+	canvas.height = IMG_HEIGHT;
+	const ctx = canvas.getContext("2d")!;
 
-		// --- Top accent strip (Google colors) ---
-		const strip = ctx.createLinearGradient(0,0,W,0);
-		strip.addColorStop(0,"#4285F4");
-		strip.addColorStop(0.33,"#34A853");
-		strip.addColorStop(0.66,"#FBBC05");
-		strip.addColorStop(1,"#EA4335");
-		ctx.fillStyle = strip;
-		ctx.fillRect(0, 0, W, 8);
+	// Cargar la imagen de fondo (según idioma)
+	const bgImagePath = lang === "es" 
+		? "/reputation-qr/español.png" 
+		: "/reputation-qr/ingles.png";
 
-		// --- Light gray header zone ---
-		ctx.fillStyle = "#F8F9FA";
-		ctx.fillRect(0, 8, W, 200);
-		ctx.strokeStyle = "#E8EAED";
-		ctx.lineWidth = 1;
-		ctx.beginPath(); ctx.moveTo(0,208); ctx.lineTo(W,208); ctx.stroke();
+	const bgImage = new Image();
+	bgImage.crossOrigin = "anonymous";
 
-		// --- Google "G" logo (big, centered) ---
-		const cx = 140, cy = 108;
-		// Draw G circle segments
-		const gColors = ["#4285F4","#34A853","#FBBC05","#EA4335"];
-		const angles = [[Math.PI*0.1, Math.PI*0.6],[Math.PI*0.6, Math.PI*1.1],[Math.PI*1.1,Math.PI*1.6],[Math.PI*1.6,Math.PI*2.1]];
-		gColors.forEach((c,i) => {
-			ctx.beginPath();
-			ctx.moveTo(cx,cy);
-			ctx.arc(cx,cy,50,angles[i][0],angles[i][1]);
-			ctx.closePath();
-			ctx.fillStyle=c; ctx.fill();
-		});
-		ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(cx,cy,32,0,Math.PI*2); ctx.fill();
-		ctx.fillStyle="#4285F4"; ctx.fillRect(cx,cy-12,50,24);
-		ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(cx,cy,18,0,Math.PI*2); ctx.fill();
+	// Cargar QR desde API
+	const qrImage = new Image();
+	qrImage.crossOrigin = "anonymous";
 
-		// --- "Google Reviews" text ---
-		ctx.textAlign="left";
-		ctx.font = "bold 38px Georgia, serif";
-		const letters = [
-			{t:"G",c:"#4285F4"},{t:"o",c:"#EA4335"},{t:"o",c:"#FBBC05"},
-			{t:"g",c:"#4285F4"},{t:"l",c:"#34A853"},{t:"e",c:"#EA4335"},
-		];
-		let lx = 210;
-		letters.forEach(l => {
-			ctx.fillStyle = l.c;
-			ctx.fillText(l.t, lx, 95);
-			lx += ctx.measureText(l.t).width;
-		});
-		ctx.font = "300 30px Arial"; ctx.fillStyle="#5F6368";
-		ctx.fillText(" Reviews", lx, 95);
+	// Cuando ambas imágenes estén cargadas
+	await Promise.all([
+		new Promise<void>(resolve => {
+			bgImage.onload = () => resolve();
+			bgImage.src = bgImagePath;
+		}),
+		new Promise<void>(resolve => {
+			qrImage.onload = () => resolve();
+			qrImage.src = qrApiUrl;
+		})
+	]);
 
-		// --- Stars ---
-		ctx.font = "28px Arial"; ctx.fillStyle="#FBBC05";
-		ctx.fillText("★★★★★  4.9", 210, 145);
+	// Dibujar la imagen de fondo
+	ctx.drawImage(bgImage, 0, 0, IMG_WIDTH, IMG_HEIGHT);
 
-		// --- Divider ---
-		ctx.strokeStyle="#DADCE0"; ctx.lineWidth=1;
-		ctx.beginPath(); ctx.moveTo(210,165); ctx.lineTo(760,165); ctx.stroke();
-
-		// --- Shop name ---
-		ctx.textAlign="left";
-		ctx.font = "bold 20px Arial"; ctx.fillStyle="#5F6368";
-		ctx.fillText((lang==="es"?"Califica tu experiencia en":"Rate your experience at").toUpperCase(), 210, 192);
-
-		// --- Large business name centered ---
-		ctx.textAlign="center";
-		ctx.font = "bold 42px Arial"; ctx.fillStyle="#202124";
-		ctx.fillText(shop.name, W/2, 265);
-
-		// --- Tagline ---
-		ctx.font = "22px Arial"; ctx.fillStyle="#5F6368";
-		ctx.fillText(lang==="es"?"Tu opinión nos ayuda a mejorar":"Your opinion helps us improve", W/2, 305);
-
-		// --- QR code with white border card ---
-		const qSize = 460, qX = (W-qSize)/2, qY = 340;
-		// Shadow effect
-		ctx.fillStyle = "#E8EAED";
-		ctx.beginPath();
-		ctx.roundRect(qX+6, qY+6, qSize, qSize, 20);
-		ctx.fill();
-		// White card
-		ctx.fillStyle = "#FFFFFF";
-		ctx.strokeStyle = "#DADCE0";
-		ctx.lineWidth = 2;
-		ctx.beginPath();
-		ctx.roundRect(qX, qY, qSize, qSize, 20);
-		ctx.fill(); ctx.stroke();
-
-		// Load and draw QR
-		const img = new Image(); img.crossOrigin="anonymous";
-		img.onload = () => {
-			const pad = 30;
-			ctx.drawImage(img, qX+pad, qY+pad, qSize-pad*2, qSize-pad*2);
-
-			// --- Bottom section ---
-			const botY = qY + qSize + 40;
-
-			// Scan instruction pill
-			ctx.fillStyle = "#1A73E8";
-			ctx.beginPath();
-			ctx.roundRect(W/2-200, botY, 400, 60, 30);
-			ctx.fill();
-			ctx.font = "bold 22px Arial"; ctx.fillStyle="#FFFFFF"; ctx.textAlign="center";
-			ctx.fillText(lang==="es"?"📷  Escanea con tu cámara":"📷  Scan with your camera", W/2, botY+38);
-
-			// Two options below
-			const optY = botY + 90;
-			// Option 1 - complaint
-			ctx.fillStyle = "#FEF3F2"; ctx.strokeStyle="#FCA5A5"; ctx.lineWidth=1.5;
-			ctx.beginPath(); ctx.roundRect(60, optY, 310, 80, 14); ctx.fill(); ctx.stroke();
-			ctx.font = "bold 18px Arial"; ctx.fillStyle="#B91C1C"; ctx.textAlign="center";
-			ctx.fillText(lang==="es"?"💬 Tengo una queja":"💬 I have a complaint", 215, optY+32);
-			ctx.font = "14px Arial"; ctx.fillStyle="#6B7280";
-			ctx.fillText(lang==="es"?"→ WhatsApp directo":"→ Direct WhatsApp", 215, optY+56);
-
-			// Option 2 - review
-			ctx.fillStyle = "#F0FDF4"; ctx.strokeStyle="#86EFAC"; ctx.lineWidth=1.5;
-			ctx.beginPath(); ctx.roundRect(430, optY, 310, 80, 14); ctx.fill(); ctx.stroke();
-			ctx.font = "bold 18px Arial"; ctx.fillStyle="#15803D"; ctx.textAlign="center";
-			ctx.fillText(lang==="es"?"⭐ Dejar reseña":"⭐ Leave a review", 585, optY+32);
-			ctx.font = "14px Arial"; ctx.fillStyle="#6B7280";
-			ctx.fillText(lang==="es"?"→ Google Reviews":"→ Google Reviews", 585, optY+56);
-
-			// --- Bottom bar ---
-			ctx.fillStyle = strip;
-			ctx.fillRect(0, H-8, W, 8);
-
-			// Powered by (subtle)
-			ctx.font = "13px Arial"; ctx.fillStyle="#BDC1C6"; ctx.textAlign="center";
-			ctx.fillText("Powered by Goolinext", W/2, H-20);
-
-			// Download
-			const a = document.createElement("a");
-			a.href = canvas.toDataURL("image/png", 1.0);
-			a.download = `${shop.name.replace(/\s+/g,"-")}-google-review-qr.png`;
-			a.click();
-		};
-		img.src = qrApiUrl;
+	// Coordenadas del cuadro blanco con borde dorado
+	const QR_BOX = {
+		left: 240,
+		top: 340,
+		width: 606,
+		height: 606,
 	};
+
+	// Margen interior para que el QR no toque los bordes
+	const QR_MARGIN = 30;
+
+	// Calcular posición y tamaño del QR dentro del cuadro
+	const qrSize = QR_BOX.width - (QR_MARGIN * 2);
+	const qrX = QR_BOX.left + QR_MARGIN;
+	const qrY = QR_BOX.top + QR_MARGIN;
+
+	// Dibujar el QR centrado en el cuadro blanco
+	ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+
+	// Descargar
+	const a = document.createElement("a");
+	a.href = canvas.toDataURL("image/png", 1.0);
+	a.download = `${shop.name.replace(/\s+/g, "-")}-google-review-qr.png`;
+	a.click();
+};
+;
 
 	return (
 		<div className="space-y-6">
