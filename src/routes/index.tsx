@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
 	ArrowLeft,
+	BarChart2,
 	Bell,
 	CalendarCheck,
 	Camera,
@@ -36,9 +37,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { auth, bp, dash, type Lang } from "@/lib/i18n";
-import { compressImage } from "@/lib/image-utils";
 import {
 	barberCallNext,
+	barberCancelVisit,
 	barberCompleteClient,
 	callNextClient,
 	cancelQueueEntry,
@@ -77,19 +78,20 @@ import {
 	createCheckoutSession,
 	getSubscriptionStatus,
 	cancelSubscription,
-	activateSubscription,
-	getShopAppointments,
-	cancelAppointment,
 	getAvailableSlots,
-	createAppointment,
-	processAppointmentReminders,
-	processAppointmentsToQueue,
-	requestCancelAppointment,
-	confirmCancelAppointment,
 	updateOwnerPhone,
 	getOwnerPhone,
-	getBarberAppointments,
+	getDailyReport,
+	getInactiveClients,
+	updateClientCallStatus,
+	updateShop as updateShopFn,
+	getMonthlyReport,
 	updateBarberPhone,
+	toggleBarberDirectPayment,
+	createStripeConnectLink,
+	getShopStripeStatus,
+	updateShopDepositSettings,
+	getYearlyReport,
 } from "@/lib/server-fns";
 import { useWebSocket } from "@/lib/websocket";
 
@@ -399,22 +401,22 @@ function AuthScreen({
 			<section style={{ position:"relative", zIndex:1, maxWidth:1100, margin:"0 auto", padding:"96px 24px 80px", textAlign:"center" }}>
 				<div className="a1" style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"5px 16px", background:"rgba(249,115,22,0.08)", border:"1px solid rgba(249,115,22,0.2)", borderRadius:100, marginBottom:28 }}>
 					<div style={{ width:6, height:6, borderRadius:"50%", background:"#f97316", animation:"pulse-dot 1.8s ease infinite" }} />
-					<span style={{ color:"#f97316", fontSize:11, fontWeight:700, letterSpacing:"0.1em" }}>{lang === "es" ? "LA PLATAFORMA #1 PARA BARBERÍAS" : "THE #1 BARBERSHOP MANAGEMENT PLATFORM"}</span>
+					<span style={{ color:"#f97316", fontSize:11, fontWeight:700, letterSpacing:"0.1em" }}>{lang === "es" ? "La Nueva Forma de Controlar tu Negocio" : "THE #1 BARBERSHOP MANAGEMENT PLATFORM"}</span>
 				</div>
 				<h1 className="a2" style={{ fontSize:"clamp(44px,7vw,82px)", fontWeight:800, color:"white", lineHeight:1.02, letterSpacing:"-3px", margin:"0 0 22px" }}>
-					{lang === "es" ? "Tu Barbería," : "Your Barbershop,"}<br/>
+					{lang === "es" ? "Todo tu Negocio en" : "Your Entire Business"}<br/>
 					<span style={{ background:"linear-gradient(135deg,#f97316 20%,#fbbf24 80%)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-						{lang === "es" ? "Completamente Automatizada." : "Fully Automated."}
+						{lang === "es" ? "un Solo Sistema." : "in One System."}
 					</span>
 				</h1>
 				<p className="a3" style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:"clamp(15px,2vw,18px)", color:"#64748b", maxWidth:600, margin:"0 auto 48px", lineHeight:1.8, fontWeight:300 }}>
 					{lang === "es"
-						? "Deja de perder clientes por la desorganización. Goolinext le da a tu barbería una cola virtual, citas automatizadas, SMS instantáneos y una presencia online profesional — para que te enfoques en lo que mejor sabes hacer."
-						: "Stop losing clients to disorganization. Goolinext gives your barbershop a virtual queue, automated appointments, instant SMS and a professional online presence — so you can focus on what you do best."}
+						? "Para barberías y negocios de belleza: organiza la fila de clientes en tiempo real, guarda contactos automáticamente, crea tu página web profesional, controla los ingresos de tu negocio y recupera ingresos perdidos sin complicaciones."
+						: "For barbershops and beauty businesses: organize your client queue in real time, save contacts automatically, create your professional website, control your business income and recover lost revenue without the hassle."}
 				</p>
 				<div className="a4 lbtn-row" style={{ display:"flex", gap:14, justifyContent:"center", flexWrap:"wrap", marginBottom:60 }}>
 					<button type="button" className="lgb" onClick={() => { setMode("signup"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"16px 40px", background:"linear-gradient(135deg,#f97316,#ea580c)", border:"none", borderRadius:12, color:"white", fontSize:16, fontWeight:700, boxShadow:"0 8px 28px rgba(249,115,22,0.3)", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
-						{lang === "es" ? "Empezar ahora — $150/mes" : "Start now — $150/mo"}
+						{lang === "es" ? "3 días gratis — luego $89/mes" : "Start now — $89/mo"}
 					</button>
 					<button type="button" onClick={() => { setMode("login"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"16px 40px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:12, color:"#94a3b8", fontSize:16, fontWeight:600, cursor:"pointer", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
 						{lang === "es" ? "Ya tengo cuenta" : "I already have an account"}
@@ -437,7 +439,7 @@ function AuthScreen({
 						{lang === "es" ? "Un sistema. Control total." : "One system. Total control."}
 					</h2>
 					<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#475569", fontSize:16, maxWidth:480, margin:"0 auto" }}>
-						{lang === "es" ? "Todo lo que necesitas para manejar una barbería moderna — sin la complejidad." : "Every tool you need to run a modern barbershop — without the complexity."}
+						{lang === "es" ? "Todo lo que necesitas para organizar tu negocio, atender más clientes y recuperar ventas perdidas — sin complicaciones." : "Every tool you need to run a modern barbershop — without the complexity."}
 					</p>
 				</div>
 				<div className="lfeat-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,320px),1fr))", gap:20 }}>
@@ -446,19 +448,19 @@ function AuthScreen({
 							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
 							tag: lang === "es" ? "SIN CONFUSIÓN EN LA ESPERA" : "ZERO WAIT CONFUSION",
 							title: lang === "es" ? "Cola Virtual Inteligente" : "Smart Virtual Queue",
-							desc: lang === "es" ? "Los clientes escanean tu QR, se unen desde el teléfono, ven su espera en vivo y reciben un SMS cuando es su turno. Sin salas llenas ni llamadas perdidas." : "Clients scan your QR, join from their phone, see wait time live and get an SMS when it's their turn. No crowded waiting rooms or missed calls.",
+							desc: lang === "es" ? "Los clientes escanean tu QR, entran a la fila desde su teléfono y siguen su turno en vivo. Atiende más rápido, sin desorden ni clientes esperando sin saber." : "Clients scan your QR, join from their phone, see wait time live and get an SMS when it's their turn. No crowded waiting rooms or missed calls.",
 						},
 						{
-							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="1" fill="#f97316"/><circle cx="12" cy="15" r="1" fill="#f97316"/><circle cx="16" cy="15" r="1" fill="#f97316"/></svg>,
-							tag: lang === "es" ? "RESERVA MIENTRAS DUERMES" : "BOOKS WHILE YOU SLEEP",
-							title: lang === "es" ? "Sistema de Citas Completo" : "Appointment System",
-							desc: lang === "es" ? "Tu página reserva citas las 24 horas. El cliente elige barbero, fecha y hora. El barbero recibe SMS al instante. Las cancelaciones pasan por aprobación del dueño." : "Your page books appointments 24/7. Client picks barber, date and time. Barber gets instant SMS. Cancel requests go through owner approval.",
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+							tag: lang === "es" ? "RECUPERA INGRESOS PERDIDOS" : "RECOVER LOST REVENUE",
+							title: lang === "es" ? "Control Total de Ingresos" : "Full Revenue Control",
+							desc: lang === "es" ? "Cada cliente que no vuelve es dinero perdido. Con Goolinext mantienes orden, guardas sus datos y conviertes más visitas en ingresos reales." : "Every client who doesn't return is lost money. With Goolinext you stay organized, save their data and turn more visits into real revenue.",
 						},
 						{
-							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-							tag: lang === "es" ? "CONVIERTE VISITAS EN LEALTAD" : "TURN VISITS INTO LOYALTY",
-							title: lang === "es" ? "SMS Automáticos 24/7" : "Automatic SMS Engine",
-							desc: lang === "es" ? "Confirmación de cita, recordatorio 2 horas antes, aviso de turno, agradecimiento post-visita con link de Google Review y mensaje de retorno a los 30 días — todo automático." : "Booking confirmation, 2-hour reminder, turn alert, post-visit thank you with Google review link, and 30-day win-back message — all automatic.",
+							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>,
+							tag: lang === "es" ? "SIEMPRE A TU LADO" : "ALWAYS BY YOUR SIDE",
+							title: lang === "es" ? "Soporte por WhatsApp" : "WhatsApp Support",
+							desc: lang === "es" ? "Te ayudamos por WhatsApp en cualquier momento para configurar, resolver dudas y mantener tu negocio funcionando sin problemas." : "We help you on WhatsApp anytime to set up, solve questions and keep your business running smoothly.",
 						},
 						{
 							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
@@ -536,21 +538,21 @@ function AuthScreen({
 							<span style={{ color:"#f97316", fontSize:11, fontWeight:700, letterSpacing:"0.1em" }}>GOOLINEXT PRO</span>
 						</div>
 						<div style={{ marginBottom:32 }}>
-							<span style={{ fontSize:68, fontWeight:800, color:"white", letterSpacing:"-3px", lineHeight:1 }}>$150</span>
+							<span style={{ fontSize:68, fontWeight:800, color:"white", letterSpacing:"-3px", lineHeight:1 }}>$89</span>
 							<span style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:17, color:"#475569" }}>{lang === "es" ? " / mes" : " / month"}</span>
 						</div>
 						<div className="lprice-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,180px),1fr))", gap:"10px 24px", textAlign:"left", maxWidth:440, margin:"0 auto 40px" }}>
 							{[
-								lang === "es" ? "Cola virtual ilimitada" : "Unlimited virtual queue",
-								lang === "es" ? "Sistema de citas completo" : "Full appointment system",
-								lang === "es" ? "SMS automáticos a clientes" : "Automatic SMS to clients",
-								lang === "es" ? "SMS a barberos y dueño" : "SMS to barbers and owner",
-								lang === "es" ? "Página pública profesional" : "Professional public page",
-								lang === "es" ? "Portal individual por barbero" : "Individual barber portals",
-								lang === "es" ? "Base de clientes y CSV" : "Client database and CSV",
-								lang === "es" ? "Generador de código QR" : "QR code generator",
-								lang === "es" ? "Soporte prioritario WhatsApp" : "WhatsApp priority support",
-								lang === "es" ? "Barberos y clientes ilimitados" : "Unlimited barbers and clients",
+								lang === "es" ? "Cola virtual en tiempo real" : "Real-time virtual queue",
+								lang === "es" ? "Clientes se unen escaneando tu QR" : "Clients join by scanning your QR",
+								lang === "es" ? "Seguimiento de turnos en vivo" : "Live turn tracking",
+								lang === "es" ? "Página pública para tu negocio" : "Public page for your business",
+								lang === "es" ? "Base de datos de clientes (exportable)" : "Client database (exportable)",
+								lang === "es" ? "Generador de código QR listo para usar" : "Individual barber portals",
+								lang === "es" ? "Control de flujo y organización del negocio" : "Flow control and business organization",
+								lang === "es" ? "Visibilidad completa de tu operación" : "Full visibility of your operation",
+								lang === "es" ? "Soporte personal por WhatsApp 24/7" : "WhatsApp priority support",
+								lang === "es" ? "Clientes y barberos ilimitados" : "Unlimited clients and staff",
 							].map((item,i) => (
 								<p key={i} style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:13, color:"#64748b", display:"flex", alignItems:"center", gap:8, margin:0 }}>
 									<span style={{ color:"#f97316" }}>✓</span>{item}
@@ -568,7 +570,7 @@ function AuthScreen({
 							</p>
 						</div>
 						<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#334155", fontSize:12, marginTop:12 }}>
-							{lang === "es" ? "Sin tarjeta de crédito para registrarse · Cancela cuando quieras" : "No credit card required to sign up · Cancel anytime"}
+							{lang === "es" ? "3 días gratis + 7 días de garantía — sin riesgo" : "No credit card required to sign up · Cancel anytime"}
 						</p>
 					</div>
 				</div>
@@ -706,10 +708,10 @@ function WelcomeScreen({
 		mutationFn: () =>
 			createShop({
 				data: {
-					name,
-					address: address || undefined,
-					phone: phone || undefined,
-					googleReviewLink: googleLink || undefined,
+					name: name.trim(),
+					address: address.trim(),
+					phone: phone.trim(),
+					googleReviewLink: googleLink.trim(),
 				},
 			}),
 		onSuccess: (shop) => {
@@ -792,7 +794,7 @@ function WelcomeScreen({
 								htmlFor="ws-name"
 								className="block text-sm font-medium text-gray-300 mb-1"
 							>
-								{t.setupName}
+								{t.setupName} <span className="text-red-400">*</span>
 							</label>
 							<input
 								id="ws-name"
@@ -808,7 +810,7 @@ function WelcomeScreen({
 								htmlFor="ws-address"
 								className="block text-sm font-medium text-gray-300 mb-1"
 							>
-								{t.setupAddress}
+								{t.setupAddress} <span className="text-red-400">*</span>
 							</label>
 							<input
 								id="ws-address"
@@ -824,7 +826,7 @@ function WelcomeScreen({
 								htmlFor="ws-phone"
 								className="block text-sm font-medium text-gray-300 mb-1"
 							>
-								{t.setupPhone}
+								{t.setupPhone} <span className="text-red-400">*</span>
 							</label>
 							<input
 								id="ws-phone"
@@ -840,7 +842,7 @@ function WelcomeScreen({
 								htmlFor="ws-google"
 								className="block text-sm font-medium text-gray-300 mb-1"
 							>
-								{t.settGoogleLink}
+								{t.settGoogleLink} <span className="text-red-400">*</span>
 							</label>
 							<input
 								id="ws-google"
@@ -851,10 +853,15 @@ function WelcomeScreen({
 								className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
 							/>
 						</div>
+						{shopMutation.isError && (
+							<p className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+								{lang === "es" ? "Error al crear el negocio. Intenta de nuevo." : "Error creating business. Please try again."}
+							</p>
+						)}
 						<button
 							type="button"
 							onClick={() => shopMutation.mutate()}
-							disabled={!name.trim() || shopMutation.isPending}
+							disabled={!name.trim() || !address.trim() || !phone.trim() || !googleLink.trim() || shopMutation.isPending}
 							className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
 						>
 							{shopMutation.isPending ? t.setupCreating : t.setupCreate}
@@ -950,15 +957,10 @@ function Dashboard({
 }) {
 	const t = dash[lang];
 	const [activeTab, setActiveTab] = useState<
-		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help" | "appointments"
+		"dashboard" | "queue" | "barbers" | "qr" | "clients" | "settings" | "help" | "reports" | "retention" | "reputation"
 	>("dashboard");
 
-	const { data: cancelRequests } = useQuery({
-		queryKey: ["cancelRequests", shop.id],
-		queryFn: () => getShopAppointments({ data: { shopId: shop.id } }),
-		refetchInterval: 30000,
-	});
-	const pendingCancels = (cancelRequests ?? []).filter((a: any) => a.cancelRequested).length;
+
 
 	const { data: subStatus, isLoading: subLoading, refetch: refetchSub } = useQuery({
 		queryKey: ["subscriptionStatus"],
@@ -997,8 +999,7 @@ function Dashboard({
 	useEffect(() => {
 		const run = () => {
 			processReminders().catch(() => {});
-			processAppointmentReminders().catch(() => {});
-			processAppointmentsToQueue().catch(() => {});
+
 		};
 		run();
 		const interval = setInterval(run, 5 * 60 * 1000); // every 5 min for queue
@@ -1011,18 +1012,22 @@ function Dashboard({
 		{ key: "barbers" as const, label: t.tabBarbers, icon: Scissors },
 		{ key: "qr" as const, label: t.tabQR, icon: QrCode },
 		{ key: "clients" as const, label: t.tabClients, icon: Database },
-		{ key: "appointments" as const, label: lang === "es" ? `Citas${pendingCancels > 0 ? ` (${pendingCancels})` : ""}` : `Appts${pendingCancels > 0 ? ` (${pendingCancels})` : ""}`, icon: CalendarCheck },
+		{ key: "reports" as const, label: lang === "es" ? "Reportes" : "Reports", icon: BarChart2 },
+		{ key: "retention" as const, label: lang === "es" ? "Retención" : "Retention", icon: Users },
+		{ key: "reputation" as const, label: lang === "es" ? "Reputación" : "Reputation", icon: Star },
 		{ key: "help" as const, label: lang === "es" ? "Ayuda" : "Help", icon: Bell },
 		{ key: "settings" as const, label: t.tabSettings, icon: Settings },
 	];
 
 	// Show paywall if not subscribed (only when we have definitive data)
 	if (!subLoading && subStatus !== undefined && subStatus?.status !== "active") {
-		return <PaywallScreen lang={lang} onPaid={() => window.location.reload()} />;
+		const isExpired = subStatus?.status === "canceled" || subStatus?.status === "past_due" || subStatus?.status === "unpaid";
+		return <PaywallScreen lang={lang} onPaid={() => window.location.reload()} isExpired={isExpired} />;
 	}
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+
 			{/* Header */}
 			<div className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-10">
 				<div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -1081,7 +1086,10 @@ function Dashboard({
 					<ClientsView shopId={shop.id} lang={lang} />
 				)}
 				{activeTab === "settings" && <SettingsView shop={shop} lang={lang} />}
-				{activeTab === "appointments" && <AppointmentsView shopId={shop.id} lang={lang} />}
+
+				{activeTab === "reports" && <ReportsView shopId={shop.id} lang={lang} />}
+				{activeTab === "retention" && <RetentionView shopId={shop.id} lang={lang} />}
+				{activeTab === "reputation" && <ReputationView shop={shop} lang={lang} />}
 				{activeTab === "help" && <HelpView shopName={shop.name} lang={lang} />}
 			</div>
 		</div>
@@ -1124,10 +1132,7 @@ function BarberPortal({
 		refetchInterval: 60000,
 	});
 
-	const requestCancelMutation = useMutation({
-		mutationFn: (appointmentId: number) => requestCancelAppointment({ data: { appointmentId } }),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["barberAppointments"] }),
-	});
+
 
 	// Real-time updates
 	useWebSocket({
@@ -1145,9 +1150,21 @@ function BarberPortal({
 			queryClient.invalidateQueries({ queryKey: ["myBarberQueue"] }),
 	});
 
+	const [completingVisitId, setCompletingVisitId] = useState<number|null>(null);
+	const [amountInput, setAmountInput] = useState("");
 	const completeMutation = useMutation({
-		mutationFn: (visitId: number) =>
-			barberCompleteClient({ data: { visitId } }),
+		mutationFn: (args: { visitId: number; amountPaid: number }) =>
+			barberCompleteClient({ data: { visitId: args.visitId, amountPaid: args.amountPaid } }),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["myBarberQueue"] });
+			setCompletingVisitId(null);
+			setAmountInput("");
+		},
+	});
+
+	const barberCancelMutation = useMutation({
+		mutationFn: (args: { visitId: number; status: "cancelled" | "no_show" }) =>
+			barberCancelVisit({ data: { visitId: args.visitId, status: args.status } }),
 		onSuccess: () =>
 			queryClient.invalidateQueries({ queryKey: ["myBarberQueue"] }),
 	});
@@ -1162,6 +1179,51 @@ function BarberPortal({
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+
+			{/* Amount modal - clean bottom sheet, no keyboard push */}
+			{completingVisitId !== null && (
+				<div style={{position:"fixed",inset:0,zIndex:50,display:"flex",alignItems:"flex-end",justifyContent:"center",background:"rgba(0,0,0,0.8)"}}>
+					<div style={{width:"100%",maxWidth:480,background:"#111118",borderRadius:"24px 24px 0 0",borderTop:"1px solid rgba(255,255,255,0.08)",padding:"20px 24px",paddingBottom:"max(28px,env(safe-area-inset-bottom))"}}>
+						{/* Handle */}
+						<div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}} />
+						{/* Title */}
+						<p style={{textAlign:"center",fontSize:13,fontWeight:500,color:"rgba(255,255,255,0.4)",letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:4}}>
+							{queue?.currentClient?.clientName}
+						</p>
+						<p style={{textAlign:"center",fontSize:20,fontWeight:700,color:"white",marginBottom:24}}>
+							{lang === "es" ? "¿Cuanto le cobraras?" : "How much did you charge?"}
+						</p>
+						{/* Amount input - big and clean */}
+						<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:16,padding:"16px 24px",marginBottom:20}}>
+							<span style={{fontSize:36,fontWeight:700,color:"#4ade80",lineHeight:1}}>$</span>
+							<input
+								type="number"
+								inputMode="numeric"
+								min="0"
+								value={amountInput}
+								onChange={e => setAmountInput(e.target.value)}
+								placeholder="0"
+								style={{background:"transparent",border:"none",outline:"none",color:"white",fontSize:52,fontWeight:800,width:180,textAlign:"center",WebkitAppearance:"none",MozAppearance:"textfield"}}
+							/>
+						</div>
+						{/* Buttons */}
+						<div style={{display:"flex",gap:12}}>
+							<button type="button"
+								onClick={() => { setCompletingVisitId(null); setAmountInput(""); }}
+								style={{flex:1,padding:"16px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:14,color:"rgba(255,255,255,0.6)",fontSize:16,fontWeight:600,cursor:"pointer"}}>
+								{lang === "es" ? "Cancelar" : "Cancel"}
+							</button>
+							<button type="button"
+								onClick={() => { if(amountInput) completeMutation.mutate({ visitId: completingVisitId!, amountPaid: parseFloat(amountInput) }); }}
+								disabled={!amountInput || completeMutation.isPending}
+								style={{flex:1,padding:"16px",background:amountInput?"#22c55e":"rgba(34,197,94,0.3)",border:"none",borderRadius:14,color:"white",fontSize:16,fontWeight:700,cursor:amountInput?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+								{completeMutation.isPending ? "..." : (lang === "es" ? "✓ Confirmar" : "✓ Confirm")}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
 			{/* Header */}
 			<div className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-xl sticky top-0 z-10">
 				<div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
@@ -1222,17 +1284,46 @@ function BarberPortal({
 									)}
 								</div>
 							</div>
-							<button
-								type="button"
-								onClick={() =>
-									completeMutation.mutate(queue.currentClient?.visitId)
-								}
-								disabled={completeMutation.isPending}
-								className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-xl hover:bg-green-500/30 transition-all text-sm font-medium"
-							>
-								<Check className="w-4 h-4" />
-								{tb.complete}
-							</button>
+							{completingVisitId === queue.currentClient?.visitId ? (
+								<div className="flex flex-col gap-2 mt-2 w-full">
+									<p className="text-xs text-gray-400 font-medium">{lang === "es" ? "¿Cuánto pagó el cliente?" : "How much did the client pay?"}</p>
+									<div className="flex items-center gap-2 w-full">
+										<span className="text-gray-300 font-bold text-lg flex-shrink-0">$</span>
+										<input
+											type="number"
+											min="0"
+											step="0.01"
+											value={amountInput}
+											onChange={e => setAmountInput(e.target.value)}
+											placeholder="0.00"
+											autoFocus
+											className="min-w-0 flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white text-lg font-bold focus:outline-none focus:border-green-500"
+										/>
+									</div>
+									<div className="flex gap-2 w-full">
+										<button
+											type="button"
+											onClick={() => { if(amountInput) completeMutation.mutate({ visitId: completingVisitId!, amountPaid: parseFloat(amountInput) }); }}
+											disabled={!amountInput || completeMutation.isPending}
+											className="flex-1 py-3 bg-green-500 text-white rounded-xl font-bold disabled:opacity-40 flex items-center justify-center gap-2"
+										>
+											{completeMutation.isPending ? "..." : <><Check className="w-4 h-4" />{lang === "es" ? "Confirmar" : "Confirm"}</>}
+										</button>
+										<button type="button" onClick={() => { setCompletingVisitId(null); setAmountInput(""); }} className="px-4 py-3 bg-gray-700 text-gray-300 rounded-xl text-sm font-medium">
+											{lang === "es" ? "Cancelar" : "Cancel"}
+										</button>
+									</div>
+								</div>
+							) : (
+								<button
+									type="button"
+									onClick={() => { setCompletingVisitId(queue.currentClient?.visitId ?? null); setAmountInput(""); }}
+									className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-xl hover:bg-green-500/30 transition-all text-sm font-medium"
+								>
+									<Check className="w-4 h-4" />
+									{tb.complete}
+								</button>
+							)}
 						</div>
 					) : (
 						<div className="px-5 py-6 text-center">
@@ -1241,10 +1332,18 @@ function BarberPortal({
 					)}
 				</div>
 
-				{/* Next client button */}
+				{/* Next client button - requires amount if there's a current client */}
 				<button
 					type="button"
-					onClick={() => nextMutation.mutate()}
+					onClick={() => {
+						if (queue?.currentClient && completingVisitId !== queue.currentClient.visitId) {
+							// Force amount popup first
+							setCompletingVisitId(queue.currentClient.visitId);
+							setAmountInput("");
+						} else {
+							nextMutation.mutate();
+						}
+					}}
 					disabled={
 						nextMutation.isPending ||
 						((queue?.waitingCount ?? 0) === 0 && !queue?.currentClient)
@@ -1255,42 +1354,9 @@ function BarberPortal({
 					{tb.nextClient}
 				</button>
 
-				{/* Today's Appointments */}
-				{myAppointments && myAppointments.length > 0 && (
-					<div className="bg-gray-900/60 border border-amber-500/20 rounded-2xl overflow-hidden">
-						<div className="px-5 py-3 border-b border-gray-800 flex items-center gap-2">
-							<CalendarCheck className="w-4 h-4 text-amber-400" />
-							<p className="text-sm font-medium text-amber-400">
-								{lang === "es" ? "Mis citas de hoy" : "My appointments today"} ({myAppointments.length})
-							</p>
-						</div>
-						<div className="divide-y divide-gray-800/50">
-							{myAppointments.map(appt => (
-								<div key={appt.id} className="px-5 py-3 flex items-center justify-between gap-3">
-									<div>
-										<p className="text-white font-medium text-sm">{appt.clientName}</p>
-										<p className="text-gray-500 text-xs flex items-center gap-1">
-											<Clock className="w-3 h-3" />
-											{(() => { const [h,m] = appt.appointmentTime.split(":").map(Number); return `${h%12||12}:${m.toString().padStart(2,"0")} ${h>=12?"PM":"AM"}`; })()}
-										</p>
-										{appt.clientPhone && <p className="text-gray-600 text-xs">{appt.clientPhone}</p>}
-										{(appt as any).cancelRequested && <span className="text-xs text-orange-400">⏳ {lang === "es" ? "Cancelación pendiente aprobación" : "Cancellation pending approval"}</span>}
-									</div>
-									{!(appt as any).cancelRequested && (
-										<button
-											type="button"
-											onClick={() => requestCancelMutation.mutate(appt.id)}
-											disabled={requestCancelMutation.isPending}
-											className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors flex-shrink-0"
-										>
-											{lang === "es" ? "Solicitar cancelación" : "Request cancel"}
-										</button>
-									)}
-								</div>
-							))}
-						</div>
-					</div>
-				)}
+
+
+
 
 				{/* Waiting list */}
 				{queue?.waitingClients && queue.waitingClients.length > 0 ? (
@@ -1332,6 +1398,14 @@ function BarberPortal({
 											)}
 										</div>
 									</div>
+									<div className="flex gap-1.5">
+										<button type="button" onClick={() => { if(confirm(lang==="es"?"¿Marcar como cancelado?":"Mark as cancelled?")) barberCancelMutation.mutate({ visitId: client.visitId, status: "cancelled" }); }} disabled={barberCancelMutation.isPending} className="px-2.5 py-1.5 bg-red-500/15 text-red-400 border border-red-500/25 rounded-lg text-xs font-medium hover:bg-red-500/25 transition-all">
+											{lang === "es" ? "Canceló" : "Cancelled"}
+										</button>
+										<button type="button" onClick={() => { if(confirm(lang==="es"?"¿Marcar como no se presentó?":"Mark as no-show?")) barberCancelMutation.mutate({ visitId: client.visitId, status: "no_show" }); }} disabled={barberCancelMutation.isPending} className="px-2.5 py-1.5 bg-gray-700/50 text-gray-400 border border-gray-700 rounded-lg text-xs font-medium hover:bg-gray-700 transition-all">
+											{lang === "es" ? "No llegó" : "No-show"}
+										</button>
+									</div>
 								</div>
 							))}
 						</div>
@@ -1349,6 +1423,7 @@ function BarberPortal({
 // ============ STATS VIEW ============
 
 function StatsView({ shopId, lang }: { shopId: number; lang: Lang }) {
+	const [showAllVisits, setShowAllVisits] = useState(false);
 	const t = dash[lang];
 	const { data: stats } = useQuery({
 		queryKey: ["stats", shopId],
@@ -1426,6 +1501,14 @@ function StatsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 								</div>
 							</div>
 						))}
+						{stats.recentVisits.length > 5 && (
+							<button type="button" onClick={() => setShowAllVisits(v => !v)}
+								className="w-full py-3 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-all border-t border-gray-800">
+								{showAllVisits
+									? (lang === "es" ? "▲ Ver menos" : "▲ Show less")
+									: (lang === "es" ? `▼ Ver ${stats.recentVisits.length - 5} más` : `▼ Show ${stats.recentVisits.length - 5} more`)}
+							</button>
+						)}
 					</div>
 				) : (
 					<div className="p-8 text-center">
@@ -1468,11 +1551,16 @@ function QueueView({ shopId, lang }: { shopId: number; lang: Lang }) {
 			queryClient.invalidateQueries({ queryKey: ["shopQueues", shopId] }),
 	});
 
+	const [ownerCompletingVisitId, setOwnerCompletingVisitId] = useState<number|null>(null);
+	const [ownerAmountInput, setOwnerAmountInput] = useState("");
 	const completeMutation = useMutation({
-		mutationFn: (visitId: number) =>
-			completeClient({ data: { visitId, shopId } }),
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: ["shopQueues", shopId] }),
+		mutationFn: (args: { visitId: number; amountPaid: number }) =>
+			completeClient({ data: { visitId: args.visitId, shopId, amountPaid: args.amountPaid } }),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["shopQueues", shopId] });
+			setOwnerCompletingVisitId(null);
+			setOwnerAmountInput("");
+		},
 	});
 
 	const cancelMutation = useMutation({
@@ -1580,17 +1668,31 @@ function QueueView({ shopId, lang }: { shopId: number; lang: Lang }) {
 											</p>
 										</div>
 									</div>
-									<button
-										type="button"
-										onClick={() =>
-											completeMutation.mutate(q.currentClient?.visitId)
-										}
-										disabled={completeMutation.isPending}
-										className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-all text-xs font-medium"
-									>
-										<Check className="w-3.5 h-3.5" />
-										{t.completeBtn}
-									</button>
+									{ownerCompletingVisitId === q.currentClient?.visitId ? (
+										<div className="flex items-center gap-2 mt-2">
+											<span className="text-gray-300 font-bold">$</span>
+											<input
+												type="number" min="0" step="0.01"
+												value={ownerAmountInput}
+												onChange={e => setOwnerAmountInput(e.target.value)}
+												placeholder="0.00" autoFocus
+												className="w-24 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+											/>
+											<button type="button" onClick={() => { if(ownerAmountInput) completeMutation.mutate({ visitId: ownerCompletingVisitId!, amountPaid: parseFloat(ownerAmountInput) }); }} disabled={!ownerAmountInput || completeMutation.isPending} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-bold disabled:opacity-40">
+												{completeMutation.isPending ? "..." : "✓"}
+											</button>
+											<button type="button" onClick={() => { setOwnerCompletingVisitId(null); setOwnerAmountInput(""); }} className="px-2 py-1.5 bg-gray-700 text-gray-300 rounded-lg text-sm">✕</button>
+										</div>
+									) : (
+										<button
+											type="button"
+											onClick={() => { setOwnerCompletingVisitId(q.currentClient?.visitId ?? null); setOwnerAmountInput(""); }}
+											className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-all text-xs font-medium"
+										>
+											<Check className="w-3.5 h-3.5" />
+											{t.completeBtn}
+										</button>
+									)}
 								</div>
 							)}
 
@@ -1703,7 +1805,30 @@ function BarberPhotoAvatar({
 			const file = e.target.files?.[0];
 			if (!file || !onUpload) return;
 			try {
-				const dataUrl = await compressImage(file);
+				// Inline high-quality image resize - 800px max, 0.92 quality
+		const dataUrl = await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const img = new Image();
+				img.onload = () => {
+					let w = img.width, h = img.height;
+					const MAX = 800;
+					if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+					else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+					const c = document.createElement("canvas");
+					c.width = w; c.height = h;
+					const ctx = c.getContext("2d")!;
+					ctx.imageSmoothingEnabled = true;
+					ctx.imageSmoothingQuality = "high";
+					ctx.drawImage(img, 0, 0, w, h);
+					resolve(c.toDataURL("image/jpeg", 0.92));
+				};
+				img.onerror = reject;
+				img.src = reader.result as string;
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
 				onUpload(dataUrl);
 			} catch {
 				// Silently ignore — invalid file
@@ -1777,6 +1902,7 @@ function BarberPhotoAvatar({
 function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 	const t = dash[lang];
 	const queryClient = useQueryClient();
+
 	const [name, setName] = useState("");
 	const [specialty, setSpecialty] = useState("");
 	const [barberPhone, setBarberPhone] = useState("");
@@ -1849,13 +1975,17 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 			queryClient.invalidateQueries({ queryKey: ["barbers", shopId] }),
 	});
 
+	const [photoError, setPhotoError] = useState<string>("");
 	const photoMutation = useMutation({
 		mutationFn: (args: { barberId: number; photoUrl: string | null }) =>
 			updateBarberPhoto({
 				data: { barberId: args.barberId, shopId, photoUrl: args.photoUrl },
 			}),
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: ["barbers", shopId] }),
+		onSuccess: () => {
+			setPhotoError("");
+			queryClient.invalidateQueries({ queryKey: ["barbers", shopId] });
+		},
+		onError: (e: any) => setPhotoError("Photo upload failed: " + (e?.message || "unknown error")),
 	});
 
 	const [editingPhone, setEditingPhone] = useState<{ id: number; phone: string } | null>(null);
@@ -2004,6 +2134,7 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 											}
 											uploading={photoMutation.isPending}
 										/>
+										{photoError && <p className="text-red-400 text-xs mt-1">{photoError}</p>}
 										<div>
 											<p className="text-white font-medium">{b.name}</p>
 											{b.specialty && (
@@ -2191,6 +2322,8 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 										)}
 									</div>
 								</div>
+
+
 							</div>
 						);
 					})}
@@ -2209,6 +2342,7 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 
 function QRView({
 	shopId,
+	shopName,
 	lang,
 }: {
 	shopId: number;
@@ -2218,40 +2352,284 @@ function QRView({
 	const t = dash[lang];
 	const registerUrl = `${window.location.origin}/register/${shopId}`;
 	const bizUrl = `${window.location.origin}/biz/${shopId}`;
-	const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(registerUrl)}&bgcolor=111827&color=f59e0b`;
+	const [cardLang, setCardLang] = useState<"en"|"es">(lang);
+	const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(registerUrl)}&bgcolor=ffffff&color=111827&margin=2`;
+
+	const cardTexts = {
+		en: { headline: "JOIN THE LINE", sub: "Scan and register in seconds.\nYou'll get an alert when it's your turn.", s1: "Scan\nthe QR", s2: "Enter\nyour name", s3: "Wait for\nyour alert", badge: "SCAN TO JOIN THE LINE", footer: "POWERED BY GOOLINEXT · MAKEMCIE LLC" },
+		es: { headline: "ÚNETE A LA COLA", sub: "Escanea y regístrate en segundos.\nRecibirás un aviso cuando sea tu turno.", s1: "Escanea\nel QR", s2: "Pon tu\nnombre", s3: "Espera\nel aviso", badge: "ESCANEAR PARA REGISTRARSE", footer: "POWERED BY GOOLINEXT · MAKEMCIE LLC" },
+	};
+	const ct = cardTexts[cardLang];
+
+	const [downloading, setDownloading] = useState(false);
+
+	const downloadCard = async () => {
+		setDownloading(true);
+		try {
+			const qrDataUrl = await new Promise<string>((resolve) => {
+				const img = new Image();
+				img.crossOrigin = "anonymous";
+				img.onload = () => {
+					const c = document.createElement("canvas");
+					c.width = img.width; c.height = img.height;
+					c.getContext("2d")!.drawImage(img, 0, 0);
+					resolve(c.toDataURL("image/png"));
+				};
+				img.src = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(registerUrl)}&bgcolor=ffffff&color=111827&margin=2`;
+			});
+
+			const W = 800, H = 1060;
+			const canvas = document.createElement("canvas");
+			canvas.width = W; canvas.height = H;
+			const ctx = canvas.getContext("2d")!;
+
+			// Background gradient
+			const bg = ctx.createLinearGradient(0, 0, W, H);
+			bg.addColorStop(0, "#0f0a05");
+			bg.addColorStop(0.5, "#1a0d00");
+			bg.addColorStop(1, "#0a0608");
+			ctx.fillStyle = bg;
+			roundRect(ctx, 0, 0, W, H, 40);
+			ctx.fill();
+
+			// Orange glow top-left
+			const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 400);
+			glow.addColorStop(0, "rgba(249,115,22,0.12)");
+			glow.addColorStop(1, "transparent");
+			ctx.fillStyle = glow;
+			ctx.fillRect(0, 0, W, H);
+
+			// Logo box
+			const logoGrad = ctx.createLinearGradient(48, 44, 110, 106);
+			logoGrad.addColorStop(0, "#f97316");
+			logoGrad.addColorStop(1, "#c2410c");
+			ctx.fillStyle = logoGrad;
+			roundRect(ctx, 48, 44, 62, 62, 16);
+			ctx.fill();
+
+			// G letter
+			ctx.fillStyle = "white";
+			ctx.font = "bold 36px Arial";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText("G", 79, 76);
+
+			// Brand name
+			ctx.fillStyle = "white";
+			ctx.font = "bold 34px Arial";
+			ctx.textAlign = "left";
+			ctx.textBaseline = "middle";
+			ctx.fillText("Goolinext", 122, 76);
+
+			// Divider line
+			const div = ctx.createLinearGradient(0, 130, W, 130);
+			div.addColorStop(0, "transparent");
+			div.addColorStop(0.5, "rgba(249,115,22,0.5)");
+			div.addColorStop(1, "transparent");
+			ctx.strokeStyle = div;
+			ctx.lineWidth = 1.5;
+			ctx.beginPath(); ctx.moveTo(48, 134); ctx.lineTo(W-48, 134); ctx.stroke();
+
+			// Headline
+			ctx.fillStyle = "white";
+			ctx.font = "bold 64px Arial Black, Arial";
+			ctx.textAlign = "left";
+			ctx.textBaseline = "top";
+			ctx.fillText(ct.headline, 48, 158);
+
+			// Subtitle
+			ctx.fillStyle = "#64748b";
+			ctx.font = "22px Arial";
+			ctx.textBaseline = "top";
+			const lines = ct.sub.split("\n");
+			lines.forEach((line, i) => ctx.fillText(line, 48, 242 + i * 32));
+
+			// Steps
+			const stepLabels = [ct.s1, ct.s2, ct.s3];
+			const stepX = [136, 400, 664];
+			stepLabels.forEach((label, i) => {
+				// Circle
+				ctx.strokeStyle = "rgba(249,115,22,0.3)";
+				ctx.fillStyle = "rgba(249,115,22,0.1)";
+				ctx.lineWidth = 1.5;
+				ctx.beginPath(); ctx.arc(stepX[i], 340, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+				// Number
+				ctx.fillStyle = "#f97316";
+				ctx.font = "bold 20px Arial";
+				ctx.textAlign = "center";
+				ctx.textBaseline = "middle";
+				ctx.fillText(String(i+1), stepX[i], 340);
+				// Label
+				ctx.fillStyle = "#475569";
+				ctx.font = "18px Arial";
+				ctx.textBaseline = "top";
+				const parts = label.replace("\n"," ").split(" ");
+				ctx.fillText(parts.slice(0,2).join(" "), stepX[i], 374);
+				if (parts.length > 2) ctx.fillText(parts.slice(2).join(" "), stepX[i], 398);
+				// Connecting line
+				if (i < 2) {
+					ctx.strokeStyle = "rgba(249,115,22,0.2)";
+					ctx.lineWidth = 1;
+					ctx.beginPath(); ctx.moveTo(stepX[i]+26, 340); ctx.lineTo(stepX[i+1]-26, 340); ctx.stroke();
+				}
+			});
+
+			// QR white background
+			ctx.fillStyle = "white";
+			ctx.shadowColor = "rgba(249,115,22,0.2)";
+			ctx.shadowBlur = 30;
+			roundRect(ctx, 80, 430, W-160, W-160, 20);
+			ctx.fill();
+			ctx.shadowBlur = 0;
+
+			// Orange corner marks
+			const corners = [[80,430],[W-80,430],[80,430+W-160],[W-80,430+W-160]];
+			corners.forEach(([cx,cy], i) => {
+				const [dx, dy] = [[1,1],[-1,1],[1,-1],[-1,-1]][i];
+				ctx.strokeStyle = "#f97316";
+				ctx.lineWidth = 4;
+				ctx.beginPath();
+				ctx.moveTo(cx + dx*30, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy*30);
+				ctx.stroke();
+			});
+
+			// QR image
+			const qrImg = new Image();
+			qrImg.crossOrigin = "anonymous";
+			await new Promise<void>(resolve => { qrImg.onload = () => resolve(); qrImg.src = qrDataUrl; });
+			const qrPad = 24;
+			ctx.drawImage(qrImg, 80+qrPad, 430+qrPad, W-160-qrPad*2, W-160-qrPad*2);
+
+			// Scan badge
+			const badgeW = 340, badgeH = 36;
+			const badgeX = (W - badgeW) / 2;
+			const badgeY = 430 + W - 160 - 18;
+			const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX+badgeW, badgeY);
+			badgeGrad.addColorStop(0, "#f97316"); badgeGrad.addColorStop(1, "#ea580c");
+			ctx.fillStyle = badgeGrad;
+			ctx.shadowColor = "rgba(249,115,22,0.5)"; ctx.shadowBlur = 12;
+			roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
+			ctx.fill();
+			ctx.shadowBlur = 0;
+			ctx.fillStyle = "white";
+			ctx.font = "bold 16px Arial";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText("📱 " + ct.badge, W/2, badgeY + badgeH/2);
+
+			// URL box
+			const urlY = 430 + W - 160 + 38;
+			ctx.fillStyle = "rgba(255,255,255,0.04)";
+			ctx.strokeStyle = "rgba(255,255,255,0.08)";
+			ctx.lineWidth = 1;
+			roundRect(ctx, 48, urlY, W-96, 44, 12);
+			ctx.fill(); ctx.stroke();
+			ctx.fillStyle = "#f97316";
+			ctx.beginPath(); ctx.arc(72, urlY+22, 5, 0, Math.PI*2); ctx.fill();
+			ctx.fillStyle = "#64748b";
+			ctx.font = "18px monospace";
+			ctx.textAlign = "left";
+			ctx.textBaseline = "middle";
+			ctx.fillText(`goolinext.com/register/${shopId}`, 86, urlY+22);
+
+			// Footer
+			ctx.fillStyle = "#334155";
+			ctx.font = "16px Arial";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "bottom";
+			ctx.fillText(ct.footer, W/2, H-24);
+
+			// Download
+			const link = document.createElement("a");
+			link.download = `goolinext-qr-${cardLang}-${shopId}.png`;
+			link.href = canvas.toDataURL("image/png", 1.0);
+			link.click();
+		} catch(e) {
+			console.error(e);
+		} finally {
+			setDownloading(false);
+		}
+	};
+
+	function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+		ctx.beginPath();
+		ctx.moveTo(x+r, y);
+		ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+		ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+		ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+		ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+		ctx.closePath();
+	}
 
 	return (
 		<div className="space-y-4">
-			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 text-center">
-				<h2 className="text-xl font-bold text-white mb-2">{t.qrTitle}</h2>
-				<p className="text-gray-400 mb-6 text-sm">{t.qrDesc}</p>
-
-				<div className="inline-block bg-white p-4 rounded-2xl mb-4">
-					<img src={qrImageUrl} alt="QR Code" className="w-64 h-64" />
+			{/* Premium Print Card */}
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-6">
+				<div className="flex items-center justify-between mb-4">
+					<h2 className="text-base font-bold text-white">{lang === "es" ? "Cartel para imprimir" : "Print poster"}</h2>
+					<div className="flex gap-2">
+						<button type="button" onClick={() => setCardLang("en")} style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:700, border:"none", cursor:"pointer", background:cardLang==="en"?"#f97316":"rgba(255,255,255,0.08)", color:cardLang==="en"?"white":"#64748b", fontFamily:"inherit" }}>EN</button>
+						<button type="button" onClick={() => setCardLang("es")} style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:700, border:"none", cursor:"pointer", background:cardLang==="es"?"#f97316":"rgba(255,255,255,0.08)", color:cardLang==="es"?"white":"#64748b", fontFamily:"inherit" }}>ES</button>
+					</div>
 				</div>
 
-				{/* Download button - right below QR */}
-				<div className="flex gap-3 justify-center mb-6">
-					<a
-						href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(registerUrl)}&bgcolor=111827&color=f59e0b&format=png`}
-						download={`QR-${shopId}.png`}
-						target="_blank"
-						rel="noopener noreferrer"
-						className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl text-sm hover:from-amber-600 hover:to-orange-700 transition-all"
-					>
-						<Download className="w-4 h-4" />
-						{lang === "es" ? "Descargar QR (alta resolución)" : "Download QR (high resolution)"}
-					</a>
+				{/* Card Preview */}
+				<div id="qr-print-card" style={{ background:"linear-gradient(135deg,#0f0a05 0%,#1a0d00 50%,#0a0608 100%)", border:"1px solid rgba(249,115,22,0.3)", borderRadius:20, padding:"28px 24px 22px", position:"relative", overflow:"hidden", fontFamily:"'Plus Jakarta Sans',sans-serif", maxWidth:320, margin:"0 auto" }}>
+					{/* Logo */}
+					<div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+						<div style={{ width:32, height:32, background:"linear-gradient(135deg,#f97316,#c2410c)", borderRadius:9, position:"relative", flexShrink:0 }}>
+							<span style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-52%)", fontWeight:800, fontSize:17, color:"white", lineHeight:1 }}>G</span>
+						</div>
+						<span style={{ fontWeight:800, fontSize:17, color:"white", letterSpacing:"-0.5px" }}>Goolinext</span>
+					</div>
+					<div style={{ height:1, background:"linear-gradient(90deg,transparent,rgba(249,115,22,0.4),transparent)", marginBottom:18 }} />
+
+					{/* Headline */}
+					<h1 style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:30, color:"white", letterSpacing:1, lineHeight:1, marginBottom:4 }}>{ct.headline}</h1>
+					<p style={{ fontSize:11, color:"#64748b", marginBottom:18, lineHeight:1.6, whiteSpace:"pre-line" }}>{ct.sub}</p>
+
+					{/* Steps */}
+					<div style={{ display:"flex", justifyContent:"center", gap:4, marginBottom:18 }}>
+						{[ct.s1, ct.s2, ct.s3].map((s, i) => (
+							<div key={i} style={{ display:"flex", alignItems:"center", gap:4, flex:1 }}>
+								<div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, flex:1 }}>
+									<div style={{ width:22, height:22, borderRadius:"50%", background:"rgba(249,115,22,0.12)", border:"1px solid rgba(249,115,22,0.25)", position:"relative" }}>
+										<span style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-52%)", fontSize:10, fontWeight:700, color:"#f97316", lineHeight:1 }}>{i+1}</span>
+									</div>
+									<span style={{ fontSize:9, color:"#475569", textAlign:"center", lineHeight:1.4, whiteSpace:"pre-line" }}>{s}</span>
+								</div>
+								{i < 2 && <div style={{ width:20, height:1, background:"rgba(249,115,22,0.2)", marginBottom:16, flexShrink:0 }} />}
+							</div>
+						))}
+					</div>
+
+					{/* QR Code */}
+					<div style={{ position:"relative", background:"white", borderRadius:14, padding:12, marginBottom:28, boxShadow:"0 0 0 1px rgba(249,115,22,0.2),0 8px 28px rgba(249,115,22,0.15)" }}>
+						{[["tl","top:6px;left:6px;borderTop","borderLeft"],["tr","top:6px;right:6px;borderTop","borderRight"],["bl","bottom:6px;left:6px;borderBottom","borderLeft"],["br","bottom:6px;right:6px;borderBottom","borderRight"]].map(([k,b1,b2]) => (
+							<div key={k} style={{ position:"absolute", width:16, height:16, ...(b1.includes("top")?{top:6}:{bottom:6}), ...(b2.includes("left")?{left:6}:{right:6}), borderTop:b1.includes("Top")?"2.5px solid #f97316":"none", borderBottom:b1.includes("Bottom")?"2.5px solid #f97316":"none", borderLeft:b2.includes("Left")?"2.5px solid #f97316":"none", borderRight:b2.includes("Right")?"2.5px solid #f97316":"none", borderRadius:k==="tl"?"3px 0 0 0":k==="tr"?"0 3px 0 0":k==="bl"?"0 0 0 3px":"0 0 3px 0" }} />
+						))}
+						<img src={qrUrl} alt="QR" style={{ width:"100%", display:"block", borderRadius:6 }} />
+						<div style={{ position:"absolute", bottom:-12, left:"50%", transform:"translateX(-50%)", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"white", fontSize:9, fontWeight:700, padding:"4px 12px", borderRadius:20, whiteSpace:"nowrap", letterSpacing:"0.08em", boxShadow:"0 3px 10px rgba(249,115,22,0.4)" }}>📱 {ct.badge}</div>
+					</div>
+
+					{/* URL */}
+					<div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:"8px 12px", marginBottom:14, display:"flex", alignItems:"center", gap:7 }}>
+						<div style={{ width:5, height:5, borderRadius:"50%", background:"#f97316", flexShrink:0 }} />
+						<span style={{ fontSize:10, color:"#64748b", fontFamily:"monospace" }}>goolinext.com/register/{shopId}</span>
+					</div>
+					<div style={{ textAlign:"center", fontSize:9, color:"#334155", letterSpacing:"0.05em" }}>{ct.footer}</div>
 				</div>
 
-				<div className="bg-gray-800 rounded-xl p-4 mb-4">
-					<p className="text-xs text-gray-500 mb-1">{t.qrLink}</p>
-					<p className="text-amber-400 text-sm break-all font-mono">
-						{registerUrl}
-					</p>
+				{/* Download/Print buttons */}
+				<div className="flex gap-3 mt-5">
+					<button type="button" onClick={downloadCard} disabled={downloading} className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl text-sm hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-60">
+						{downloading ? <div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} /> : <Download className="w-4 h-4" />}
+						{downloading ? (lang === "es" ? "Generando..." : "Generating...") : (lang === "es" ? "Descargar PNG" : "Download PNG")}
+					</button>
+					<button type="button" onClick={() => navigator.clipboard.writeText(registerUrl)} className="px-4 py-3 bg-gray-800 text-gray-300 font-semibold rounded-xl text-sm hover:bg-gray-700 transition-all">
+						<Copy className="w-4 h-4" />
+					</button>
 				</div>
-
-				<p className="text-gray-500 text-xs">{t.qrTip}</p>
 			</div>
 
 			{/* Business Public Page */}
@@ -2678,7 +3056,7 @@ function ClientsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 
 
 // ============ PAYWALL SCREEN ============
-function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () => void }) {
+function PaywallScreen({ lang: initialLang, onPaid, isExpired }: { lang: Lang; onPaid: () => void; isExpired?: boolean }) {
 	const [lang, setLang] = useState<Lang>(initialLang);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
@@ -2717,31 +3095,54 @@ function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () =
 					<Scissors className="w-8 h-8 text-white" />
 				</div>
 				<h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "white", marginBottom: 8 }}>Goolinext Pro</h1>
+				{isExpired && (
+					<div style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
+						<p style={{ color: "#22c55e", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+							{lang === "es" ? "✓ Tus datos están seguros" : "✓ Your data is safe"}
+						</p>
+						<p style={{ color: "#64748b", fontSize: 12, lineHeight: 1.6 }}>
+							{lang === "es"
+								? "Todos tus clientes, historial y configuración están guardados. Reactiva tu cuenta y continúa donde lo dejaste."
+								: "All your clients, history and settings are saved. Reactivate your account and continue where you left off."}
+						</p>
+					</div>
+				)}
 				<p style={{ color: "#64748b", fontSize: 14, marginBottom: 28, lineHeight: 1.6 }}>
-					{lang === "es"
-						? "Activa tu suscripción para acceder al sistema completo de gestión de tu barbería."
-						: "Activate your subscription to access the complete barbershop management system."}
+					{isExpired
+						? (lang === "es"
+							? "Tu suscripción está inactiva. Reactiva ahora para volver a usar Goolinext Pro."
+							: "Your subscription is inactive. Reactivate now to use Goolinext Pro again.")
+						: (lang === "es"
+							? "Activa tu suscripción para acceder al sistema completo de gestión de tu negocio."
+							: "Activate your subscription to access the complete business management system.")
+					}
 				</p>
 
 				{/* Features */}
 				<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24, textAlign: "left" }}>
 					{[
-						lang === "es" ? "✅ Cola virtual en tiempo real" : "✅ Real-time virtual queue",
-						lang === "es" ? "✅ SMS automáticos a clientes" : "✅ Automatic SMS to clients",
-						lang === "es" ? "✅ Página pública de tu negocio" : "✅ Public business page",
-						lang === "es" ? "✅ Barberos ilimitados" : "✅ Unlimited barbers",
-						lang === "es" ? "✅ Código QR descargable" : "✅ Downloadable QR code",
-						lang === "es" ? "✅ Soporte por WhatsApp" : "✅ WhatsApp support",
+						lang === "es" ? "Cola virtual en tiempo real" : "Real-time virtual queue",
+						lang === "es" ? "Clientes se unen escaneando tu QR" : "Clients join by scanning your QR",
+						lang === "es" ? "Seguimiento de turnos en vivo" : "Live turn tracking",
+						lang === "es" ? "Página pública profesional para tu negocio" : "Professional public page for your business",
+						lang === "es" ? "Base de datos de clientes (exportable)" : "Client database (exportable)",
+						lang === "es" ? "QR para gestionar reseñas y reputación" : "QR to manage reviews and reputation",
+						lang === "es" ? "Control total del flujo de clientes" : "Full client flow control",
+						lang === "es" ? "Clientes y barberos ilimitados" : "Unlimited clients and staff",
+						lang === "es" ? "Soporte personal por WhatsApp 24/7" : "Personal WhatsApp support 24/7",
 					].map((feature, i) => (
-						<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12 }}>
-							<span style={{ fontSize: 13, color: "#cbd5e1" }}>{feature}</span>
+						<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0" }}>
+							<div style={{ width: 18, height: 18, borderRadius: "50%", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+								<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+							</div>
+							<span style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.4 }}>{feature}</span>
 						</div>
 					))}
 				</div>
 
 				{/* Price */}
 				<div style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.25)", borderRadius: 16, padding: "16px", marginBottom: 20 }}>
-					<p style={{ fontSize: "2rem", fontWeight: 800, color: "white", margin: 0 }}>$150<span style={{ fontSize: "1rem", color: "#64748b", fontWeight: 400 }}>/mo</span></p>
+					<p style={{ fontSize: "2rem", fontWeight: 800, color: "white", margin: 0 }}>$89<span style={{ fontSize: "1rem", color: "#64748b", fontWeight: 400 }}>/mo</span></p>
 					<p style={{ color: "#f97316", fontSize: 12, marginTop: 4 }}>{lang === "es" ? "Todo incluido · Sin contratos" : "All included · No contracts"}</p>
 				</div>
 
@@ -2753,7 +3154,7 @@ function PaywallScreen({ lang: initialLang, onPaid }: { lang: Lang; onPaid: () =
 					disabled={loading}
 					style={{ width: "100%", padding: "16px", background: loading ? "#92400e" : "linear-gradient(135deg, #f97316, #ea580c)", color: "white", fontWeight: 700, fontSize: 16, border: "none", borderRadius: 14, cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 8px 30px rgba(249,115,22,0.35)" }}
 				>
-					{loading ? "..." : (lang === "es" ? "🚀 Activar por $150/mes" : "🚀 Activate for $150/mo")}
+					{loading ? "..." : (lang === "es" ? "Activar por $89/mes" : "Activate for $89/mo")}
 				</button>
 				<p style={{ color: "#334155", fontSize: 11, marginTop: 12 }}>
 					{lang === "es" ? "Pago seguro vía Stripe · Cancela cuando quieras" : "Secure payment via Stripe · Cancel anytime"}
@@ -2784,156 +3185,6 @@ function SubscriptionBanner({ lang }: { lang: Lang }) {
 
 
 // ============ APPOINTMENTS VIEW ============
-function AppointmentsView({ shopId, lang }: { shopId: number; lang: Lang }) {
-	const queryClient = useQueryClient();
-	const today = new Date().toISOString().split("T")[0];
-	const [selectedDate, setSelectedDate] = useState(today);
-	const [showNewForm, setShowNewForm] = useState(false);
-	const [newAppt, setNewAppt] = useState({ barberId: 0, clientName: "", clientPhone: "", date: today, time: "", notes: "" });
-
-	const { data: barberList } = useQuery({
-		queryKey: ["barbers", shopId],
-		queryFn: () => getBarbers({ data: { shopId } }),
-	});
-
-	const { data: appts, isLoading } = useQuery({
-		queryKey: ["shopAppointments", shopId, selectedDate],
-		queryFn: () => getShopAppointments({ data: { shopId, date: selectedDate } }),
-		refetchInterval: 30000,
-	});
-
-	// Get all pending cancellations regardless of date
-	const { data: allAppts } = useQuery({
-		queryKey: ["allShopAppointments", shopId],
-		queryFn: () => getShopAppointments({ data: { shopId } }),
-		refetchInterval: 30000,
-	});
-	const pendingCancelAppts = (allAppts ?? []).filter((a: any) => a.cancelRequested);
-
-	const { data: slots } = useQuery({
-		queryKey: ["availableSlots", newAppt.barberId, newAppt.date],
-		queryFn: () => getAvailableSlots({ data: { shopId, barberId: newAppt.barberId, date: newAppt.date } }),
-		enabled: !!newAppt.barberId && !!newAppt.date,
-	});
-
-	const createMutation = useMutation({
-		mutationFn: () => createAppointment({ data: { shopId, barberId: newAppt.barberId, clientName: newAppt.clientName, clientPhone: newAppt.clientPhone, date: newAppt.date, time: newAppt.time, notes: newAppt.notes } }),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["shopAppointments", shopId] });
-			setShowNewForm(false);
-			setNewAppt({ barberId: 0, clientName: "", clientPhone: "", date: today, time: "", notes: "" });
-		},
-	});
-
-	const cancelMutation = useMutation({
-		mutationFn: (appointmentId: number) => confirmCancelAppointment({ data: { appointmentId, shopId } }),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopAppointments", shopId] }),
-	});
-
-	function fmt12(t: string) {
-		const [h, m] = t.split(":").map(Number);
-		const ampm = h >= 12 ? "PM" : "AM";
-		return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${ampm}`;
-	}
-
-	return (
-		<div className="space-y-4">
-			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-semibold text-white">{lang === "es" ? "Citas" : "Appointments"}</h2>
-				<button type="button" onClick={() => setShowNewForm(!showNewForm)} className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-all text-sm font-medium">
-					<Plus className="w-4 h-4" />
-					{lang === "es" ? "Nueva cita" : "New appointment"}
-				</button>
-			</div>
-
-			{/* Pending cancellations alert */}
-			{pendingCancelAppts.length > 0 && (
-				<div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-					<p className="text-red-400 font-semibold text-sm mb-3">⚠️ {lang === "es" ? `${pendingCancelAppts.length} solicitud(es) de cancelación pendiente(s)` : `${pendingCancelAppts.length} pending cancellation request(s)`}</p>
-					<div className="space-y-2">
-						{pendingCancelAppts.map(appt => (
-							<div key={appt.id} className="flex items-center justify-between bg-gray-900/60 rounded-xl px-4 py-3">
-								<div>
-									<p className="text-white font-medium text-sm">{appt.clientName}</p>
-									<p className="text-gray-500 text-xs">{appt.appointmentDate} · {fmt12(appt.appointmentTime)} · {appt.barberName}</p>
-								</div>
-								<button type="button" onClick={() => cancelMutation.mutate(appt.id)} disabled={cancelMutation.isPending} className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-colors flex-shrink-0">
-									{lang === "es" ? "Confirmar cancelación" : "Confirm cancel"}
-								</button>
-							</div>
-						))}
-					</div>
-				</div>
-			)}
-
-			{/* Date selector */}
-			<div className="flex items-center gap-3">
-				<input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-sm" />
-				<span className="text-gray-500 text-sm">{appts?.length ?? 0} {lang === "es" ? "citas" : "appointments"}</span>
-			</div>
-
-			{/* New appointment form */}
-			{showNewForm && (
-				<div className="bg-gray-900/60 border border-amber-500/20 rounded-2xl p-5 space-y-3">
-					<h3 className="text-white font-semibold">{lang === "es" ? "Nueva Cita" : "New Appointment"}</h3>
-					<select value={newAppt.barberId} onChange={(e) => setNewAppt(p => ({ ...p, barberId: Number(e.target.value), time: "" }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50">
-						<option value={0}>{lang === "es" ? "Seleccionar barbero" : "Select barber"}</option>
-						{barberList?.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-					</select>
-					<input type="text" placeholder={lang === "es" ? "Nombre del cliente" : "Client name"} value={newAppt.clientName} onChange={(e) => setNewAppt(p => ({ ...p, clientName: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
-					<input type="tel" placeholder={lang === "es" ? "Teléfono del cliente" : "Client phone"} value={newAppt.clientPhone} onChange={(e) => setNewAppt(p => ({ ...p, clientPhone: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
-					<input type="date" value={newAppt.date} onChange={(e) => setNewAppt(p => ({ ...p, date: e.target.value, time: "" }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
-					{slots?.slots && slots.slots.length > 0 && (
-						<select value={newAppt.time} onChange={(e) => setNewAppt(p => ({ ...p, time: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50">
-							<option value="">{lang === "es" ? "Seleccionar hora" : "Select time"}</option>
-							{slots.slots.map(s => <option key={s} value={s}>{fmt12(s)}</option>)}
-						</select>
-					)}
-					<input type="text" placeholder={lang === "es" ? "Notas (opcional)" : "Notes (optional)"} value={newAppt.notes} onChange={(e) => setNewAppt(p => ({ ...p, notes: e.target.value }))} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
-					<div className="flex gap-3">
-						<button type="button" onClick={() => setShowNewForm(false)} className="flex-1 py-3 bg-gray-800 text-gray-300 rounded-xl hover:bg-gray-700 transition-all text-sm font-medium">{lang === "es" ? "Cancelar" : "Cancel"}</button>
-						<button type="button" onClick={() => createMutation.mutate()} disabled={!newAppt.barberId || !newAppt.clientName || !newAppt.clientPhone || !newAppt.time || createMutation.isPending} className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition-all text-sm">
-							{createMutation.isPending ? "..." : (lang === "es" ? "Confirmar cita" : "Confirm appointment")}
-						</button>
-					</div>
-				</div>
-			)}
-
-			{/* Appointments list */}
-			{isLoading ? (
-				<div className="text-center py-8 text-gray-500 animate-pulse">{lang === "es" ? "Cargando..." : "Loading..."}</div>
-			) : appts && appts.length > 0 ? (
-				<div className="space-y-3">
-					{appts.map(appt => (
-						<div key={appt.id} className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 flex items-center justify-between gap-3">
-							<div className="flex items-center gap-3">
-								<div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-									<CalendarCheck className="w-5 h-5 text-amber-400" />
-								</div>
-								<div>
-									<p className="text-white font-semibold text-sm">{appt.clientName}</p>
-									<p className="text-gray-500 text-xs">{fmt12(appt.appointmentTime)} · {appt.barberName}</p>
-									{appt.clientPhone && <p className="text-gray-600 text-xs">{appt.clientPhone}</p>}
-								</div>
-							</div>
-							<button type="button" onClick={() => cancelMutation.mutate(appt.id)} disabled={cancelMutation.isPending} className="p-2 text-gray-500 hover:text-red-400 transition-colors flex-shrink-0">
-								<X className="w-4 h-4" />
-							</button>
-						</div>
-					))}
-				</div>
-			) : (
-				<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 text-center">
-					<CalendarCheck className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-					<p className="text-gray-500 text-sm">{lang === "es" ? "No hay citas para este día" : "No appointments for this day"}</p>
-				</div>
-			)}
-		</div>
-	);
-}
-
-// ============ HELP VIEW ============
-
 function HelpView({ shopName, lang }: { shopName: string; lang: Lang }) {
 	const [subject, setSubject] = useState("");
 	const [message, setMessage] = useState("");
@@ -3094,15 +3345,21 @@ function SettingsView({
 }) {
 	const t = dash[lang];
 	const queryClient = useQueryClient();
+	const bizUrl = typeof window !== "undefined" ? `${window.location.origin}/biz/${shop.id}` : "";
 	const { data: fullShop } = useQuery({
 		queryKey: ["myShop"],
 		queryFn: () => getMyShop(),
 	});
 
+	const [shopName, setShopName] = useState(fullShop?.name ?? shop.name ?? "");
+	const [shopAddress, setShopAddress] = useState(fullShop?.address ?? "");
+	const [shopPhone, setShopPhone] = useState(fullShop?.phone ?? "");
 	const [googleLink, setGoogleLink] = useState(
 		fullShop?.googleReviewLink ?? "",
 	);
 	const [welcomeMsg, setWelcomeMsg] = useState(fullShop?.welcomeMessage ?? "");
+	const [welcomeMsgEn, setWelcomeMsgEn] = useState(fullShop?.welcomeMessageEn ?? "");
+	const timezone = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "America/New_York";
 	const [followUpMsg, setFollowUpMsg] = useState(
 		fullShop?.followUpMessage ?? "",
 	);
@@ -3131,6 +3388,14 @@ function SettingsView({
 		if (ownerPhoneData?.phone) setOwnerPhone(ownerPhoneData.phone);
 	}, [ownerPhoneData]);
 
+	useEffect(() => {
+		if (fullShop) {
+			if (fullShop.name) setShopName(fullShop.name);
+			if (fullShop.address) setShopAddress(fullShop.address);
+			if (fullShop.phone) setShopPhone(fullShop.phone);
+		}
+	}, [fullShop]);
+
 	const savePhoneMutation = useMutation({
 		mutationFn: () => updateOwnerPhone({ data: { phone: ownerPhone } }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ownerPhone"] }),
@@ -3156,8 +3421,12 @@ function SettingsView({
 			await updateShop({
 				data: {
 					id: shop.id,
+					name: shopName.trim() || undefined,
+					address: shopAddress.trim() || undefined,
+					phone: shopPhone.trim() || undefined,
 					googleReviewLink: googleLink || undefined,
 					welcomeMessage: welcomeMsg || undefined,
+					welcomeMessageEn: welcomeMsgEn || undefined,
 					followUpMessage: followUpMsg || undefined,
 					twilioSid: twilioSid || undefined,
 					twilioToken: twilioToken || undefined,
@@ -3167,6 +3436,7 @@ function SettingsView({
 					reminderDays: reminderDays,
 					logoUrl: logoUrl || undefined,
 					weeklyHours: JSON.stringify(weeklyHours),
+					timezone,
 				},
 			});
 			// Also save owner phone if provided
@@ -3182,175 +3452,9 @@ function SettingsView({
 
 	return (
 		<div className="space-y-6">
-			{/* Messages */}
-			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
-				<h3 className="text-lg font-semibold text-white">{t.settMessages}</h3>
-				<div>
-					<label
-						htmlFor="set-welcome"
-						className="block text-sm font-medium text-gray-300 mb-1"
-					>
-						{t.settWelcome}
-					</label>
-					<textarea
-						id="set-welcome"
-						value={welcomeMsg}
-						onChange={(e) => setWelcomeMsg(e.target.value)}
-						rows={3}
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
-					/>
-				</div>
-				<div>
-					<label
-						htmlFor="set-followup"
-						className="block text-sm font-medium text-gray-300 mb-1"
-					>
-						{t.settFollowUp}
-					</label>
-					<textarea
-						id="set-followup"
-						value={followUpMsg}
-						onChange={(e) => setFollowUpMsg(e.target.value)}
-						rows={3}
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
-					/>
-				</div>
-			</div>
 
-			{/* Google */}
-			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
-				<h3 className="text-lg font-semibold text-white flex items-center gap-2">
-					<Star className="w-5 h-5 text-amber-400" /> {t.settGoogle}
-				</h3>
-				<div>
-					<label
-						htmlFor="set-google"
-						className="block text-sm font-medium text-gray-300 mb-1"
-					>
-						{t.settGoogleLink}
-					</label>
-					<input
-						id="set-google"
-						type="url"
-						value={googleLink}
-						onChange={(e) => setGoogleLink(e.target.value)}
-						placeholder="https://g.page/r/..."
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-					/>
-				</div>
-			</div>
 
-			{/* Owner Phone */}
-			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
-				<h3 className="text-lg font-semibold text-white flex items-center gap-2">
-					📱 {lang === "es" ? "Tu número de teléfono" : "Your phone number"}
-				</h3>
-				<p className="text-sm text-gray-500">
-					{lang === "es" ? "Recibirás SMS cuando un barbero solicite cancelar una cita." : "You will receive SMS when a barber requests to cancel an appointment."}
-				</p>
-				<div className="flex gap-3">
-					<input
-						type="tel"
-						value={ownerPhone}
-						onChange={(e) => setOwnerPhone(e.target.value)}
-						placeholder="+1XXXXXXXXXX"
-						className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-					/>
-					<button
-						type="button"
-						onClick={() => savePhoneMutation.mutate()}
-						disabled={savePhoneMutation.isPending}
-						className="px-4 py-3 bg-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/30 transition-all text-sm font-medium"
-					>
-						{savePhoneMutation.isPending ? "..." : (lang === "es" ? "Guardar" : "Save")}
-					</button>
-				</div>
-				{savePhoneMutation.isSuccess && <p className="text-green-400 text-sm">✅ {lang === "es" ? "Guardado" : "Saved"}</p>}
-			</div>
-
-			{/* SMS Consent (Opt-in) */}
-			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
-				<h3 className="text-lg font-semibold text-white flex items-center gap-2">
-					<Shield className="w-5 h-5 text-blue-400" /> {t.settConsent}
-				</h3>
-				<p className="text-sm text-gray-500">{t.settConsentDesc}</p>
-				<div>
-					<label
-						htmlFor="set-consent"
-						className="block text-sm font-medium text-gray-300 mb-1"
-					>
-						{t.settConsentCustom}
-					</label>
-					<textarea
-						id="set-consent"
-						value={smsConsentText}
-						onChange={(e) => setSmsConsentText(e.target.value)}
-						rows={4}
-						placeholder={
-							lang === "es"
-								? `Ej: Acepto recibir mensajes SMS de ${shop.name} incluyendo confirmaciones de turno, recordatorios y promociones. Pueden aplicar tarifas de datos. Responde STOP para cancelar.`
-								: `e.g. I agree to receive SMS messages from ${shop.name} including turn confirmations, reminders and promotions. Data rates may apply. Reply STOP to opt out.`
-						}
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
-					/>
-					<p className="text-xs text-gray-600 mt-1">{t.settConsentDefault}</p>
-				</div>
-			</div>
-
-			{/* 30-Day Reminders */}
-			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
-				<h3 className="text-lg font-semibold text-white flex items-center gap-2">
-					<Bell className="w-5 h-5 text-purple-400" /> {t.settReminder}
-				</h3>
-				<p className="text-sm text-gray-500">{t.settReminderDesc}</p>
-				<div>
-					<label
-						htmlFor="set-reminder-days"
-						className="block text-sm font-medium text-gray-300 mb-1"
-					>
-						{t.settReminderDays}
-					</label>
-					<div className="flex items-center gap-3">
-						<input
-							id="set-reminder-days"
-							type="number"
-							min={7}
-							max={90}
-							value={reminderDays}
-							onChange={(e) =>
-								setReminderDays(
-									Math.max(7, Math.min(90, Number(e.target.value) || 30)),
-								)
-							}
-							className="w-24 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-center"
-						/>
-						<span className="text-gray-400 text-sm">
-							{t.settReminderDaysUnit}
-						</span>
-					</div>
-				</div>
-				<div>
-					<label
-						htmlFor="set-reminder-msg"
-						className="block text-sm font-medium text-gray-300 mb-1"
-					>
-						{t.settReminderMsg}
-					</label>
-					<textarea
-						id="set-reminder-msg"
-						value={reminderMessage}
-						onChange={(e) => setReminderMessage(e.target.value)}
-						rows={3}
-						placeholder={
-							lang === "es"
-								? "¡Hola {nombre}! Hace tiempo que no te vemos en {barberia}. Te esperamos pronto para tu próximo corte. 💈"
-								: "Hey {name}! It's been a while since your last visit at {shop}. Come see us for your next cut! 💈"
-						}
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
-					/>
-					<p className="text-xs text-gray-600 mt-1">{t.settReminderVars}</p>
-				</div>
-			</div>
+			{/* Messages + SMS - hidden until enabled */}
 
 			{/* Business Public Page */}
 			<div className="bg-gray-900/60 border border-amber-500/20 rounded-2xl p-5 space-y-4">
@@ -3395,7 +3499,30 @@ function SettingsView({
 									if (!file) return;
 									try {
 										setLogoUploading(true);
-										const dataUrl = await compressImage(file);
+										// Inline high-quality image resize - 800px max, 0.92 quality
+		const dataUrl = await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const img = new Image();
+				img.onload = () => {
+					let w = img.width, h = img.height;
+					const MAX = 800;
+					if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+					else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+					const c = document.createElement("canvas");
+					c.width = w; c.height = h;
+					const ctx = c.getContext("2d")!;
+					ctx.imageSmoothingEnabled = true;
+					ctx.imageSmoothingQuality = "high";
+					ctx.drawImage(img, 0, 0, w, h);
+					resolve(c.toDataURL("image/jpeg", 0.92));
+				};
+				img.onerror = reject;
+				img.src = reader.result as string;
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
 										setLogoUrl(dataUrl);
 									} catch {}
 									finally { setLogoUploading(false); }
@@ -3474,7 +3601,55 @@ function SettingsView({
 				</div>
 			</div>
 
-			<button
+			{/* Welcome message - single English field, auto-translated on public page */}
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-3">
+				<h3 className="text-sm font-semibold text-white">{lang === "es" ? "Mensaje de bienvenida (página pública)" : "Welcome message (public page)"}</h3>
+				<p className="text-xs text-gray-500">{lang === "es" ? "Escríbelo en inglés. Se muestra en la página pública del negocio." : "Write it in English. It shows on your business public page."}</p>
+				<textarea value={welcomeMsgEn} onChange={e => setWelcomeMsgEn(e.target.value)} rows={3}
+					placeholder="Where precision meets passion. The finest cuts, the best experience."
+					className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 resize-none text-sm" />
+			</div>
+
+			{/* Business Info */}
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
+				<h3 className="text-sm font-bold text-white">{lang === "es" ? "Información del negocio" : "Business Information"}</h3>
+				<div>
+					<label className="block text-xs font-medium text-gray-400 mb-1.5">{t.setupName} <span className="text-red-400">*</span></label>
+					<input type="text" value={shopName} onChange={e => setShopName(e.target.value)}
+						placeholder={t.setupNamePlaceholder}
+						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 text-sm" />
+				</div>
+				<div>
+					<label className="block text-xs font-medium text-gray-400 mb-1.5">{t.setupAddress} <span className="text-red-400">*</span></label>
+					<input type="text" value={shopAddress} onChange={e => setShopAddress(e.target.value)}
+						placeholder={t.setupAddressPlaceholder}
+						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 text-sm" />
+				</div>
+				<div>
+					<label className="block text-xs font-medium text-gray-400 mb-1.5">{t.setupPhone} <span className="text-red-400">*</span></label>
+					<input type="tel" value={shopPhone} onChange={e => setShopPhone(e.target.value)}
+						placeholder={t.setupPhonePlaceholder}
+						className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 text-sm" />
+				</div>
+			</div>
+
+			{/* Google Review Link */}
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-3">
+				<h3 className="text-base font-semibold text-white flex items-center gap-2">
+					<Star className="w-4 h-4 text-amber-400" />
+					{lang === "es" ? "Link de reseñas de Google" : "Google Reviews link"}
+				</h3>
+				<p className="text-xs text-gray-500">{lang === "es" ? "Aparecerá en tu página pública para que los clientes dejen reseñas." : "Shown on your public page so clients can leave reviews."}</p>
+				<input
+					type="url"
+					value={googleLink}
+					onChange={(e) => setGoogleLink(e.target.value)}
+					placeholder="https://g.page/r/..."
+					className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+				/>
+			</div>
+
+						<button
 				type="button"
 				onClick={() => mutation.mutate()}
 				disabled={mutation.isPending}
@@ -3594,5 +3769,941 @@ function CancelSubscriptionSection({ lang }: { lang: Lang }) {
 				</div>
 			)}
 		</>
+	);
+}
+
+// ============ REPORTS VIEW ============
+function ReputationView({ shop, lang }: { shop: any; lang: Lang }) {
+	const queryClient = useQueryClient();
+	const [whatsapp, setWhatsapp] = useState(() => {
+		const num = shop.whatsappNumber ?? "";
+		// Strip country code if already saved with it
+		const codes = ["+1787","+1","+52","+34","+57","+58","+53","+54","+56","+51","+593","+502","+504","+503","+506","+507","+809","+44","+55","+39","+33","+49"];
+		for (const c of codes) { if (num.startsWith(c)) return num.slice(c.length); }
+		return num;
+	});
+	const [countryCode, setCountryCode] = useState(() => {
+		const num = shop.whatsappNumber ?? "";
+		const codes = ["+1787","+1","+52","+34","+57","+58","+53","+54","+56","+51","+593","+502","+504","+503","+506","+507","+809","+44","+55","+39","+33","+49"];
+		for (const c of codes) { if (num.startsWith(c)) return c; }
+		return "+1";
+	});
+	const [saved, setSaved] = useState(false);
+	const [showQR, setShowQR] = useState(false);
+	// Only generate QR URL after whatsapp is saved
+	const savedWhatsapp = shop.whatsappNumber ?? "";
+	const reviewUrl = `${typeof window !== "undefined" ? window.location.origin : "https://goolinext.com"}/biz/${shop.id}?review=1`;
+	const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(reviewUrl)}&bgcolor=ffffff&color=000000&margin=20`;
+
+	const [saveError, setSaveError] = useState("");
+	const saveMutation = useMutation({
+		mutationFn: () => updateShop({ data: { id: shop.id, whatsappNumber: countryCode + whatsapp.replace(/\D/g,"") } }),
+		onSuccess: () => {
+			setSaved(true);
+			setShowQR(true);
+			setSaveError("");
+			queryClient.invalidateQueries({ queryKey: ["myShop"] });
+		},
+		onError: (e: any) => setSaveError(e?.message || "Error al guardar"),
+	});
+
+	const downloadQR = async () => {
+		const W = 800, H = 1000;
+		const canvas = document.createElement("canvas");
+		canvas.width = W; canvas.height = H;
+		const ctx = canvas.getContext("2d")!;
+
+		// --- Background: white ---
+		ctx.fillStyle = "#FFFFFF";
+		ctx.fillRect(0, 0, W, H);
+
+		// --- Top accent strip (Google colors) ---
+		const strip = ctx.createLinearGradient(0,0,W,0);
+		strip.addColorStop(0,"#4285F4");
+		strip.addColorStop(0.33,"#34A853");
+		strip.addColorStop(0.66,"#FBBC05");
+		strip.addColorStop(1,"#EA4335");
+		ctx.fillStyle = strip;
+		ctx.fillRect(0, 0, W, 8);
+
+		// --- Light gray header zone ---
+		ctx.fillStyle = "#F8F9FA";
+		ctx.fillRect(0, 8, W, 200);
+		ctx.strokeStyle = "#E8EAED";
+		ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.moveTo(0,208); ctx.lineTo(W,208); ctx.stroke();
+
+		// --- Google "G" logo (big, centered) ---
+		const cx = 140, cy = 108;
+		// Draw G circle segments
+		const gColors = ["#4285F4","#34A853","#FBBC05","#EA4335"];
+		const angles = [[Math.PI*0.1, Math.PI*0.6],[Math.PI*0.6, Math.PI*1.1],[Math.PI*1.1,Math.PI*1.6],[Math.PI*1.6,Math.PI*2.1]];
+		gColors.forEach((c,i) => {
+			ctx.beginPath();
+			ctx.moveTo(cx,cy);
+			ctx.arc(cx,cy,50,angles[i][0],angles[i][1]);
+			ctx.closePath();
+			ctx.fillStyle=c; ctx.fill();
+		});
+		ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(cx,cy,32,0,Math.PI*2); ctx.fill();
+		ctx.fillStyle="#4285F4"; ctx.fillRect(cx,cy-12,50,24);
+		ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(cx,cy,18,0,Math.PI*2); ctx.fill();
+
+		// --- "Google Reviews" text ---
+		ctx.textAlign="left";
+		ctx.font = "bold 38px Georgia, serif";
+		const letters = [
+			{t:"G",c:"#4285F4"},{t:"o",c:"#EA4335"},{t:"o",c:"#FBBC05"},
+			{t:"g",c:"#4285F4"},{t:"l",c:"#34A853"},{t:"e",c:"#EA4335"},
+		];
+		let lx = 210;
+		letters.forEach(l => {
+			ctx.fillStyle = l.c;
+			ctx.fillText(l.t, lx, 95);
+			lx += ctx.measureText(l.t).width;
+		});
+		ctx.font = "300 30px Arial"; ctx.fillStyle="#5F6368";
+		ctx.fillText(" Reviews", lx, 95);
+
+		// --- Stars ---
+		ctx.font = "28px Arial"; ctx.fillStyle="#FBBC05";
+		ctx.fillText("★★★★★  4.9", 210, 145);
+
+		// --- Divider ---
+		ctx.strokeStyle="#DADCE0"; ctx.lineWidth=1;
+		ctx.beginPath(); ctx.moveTo(210,165); ctx.lineTo(760,165); ctx.stroke();
+
+		// --- Shop name ---
+		ctx.textAlign="left";
+		ctx.font = "bold 20px Arial"; ctx.fillStyle="#5F6368";
+		ctx.fillText((lang==="es"?"Califica tu experiencia en":"Rate your experience at").toUpperCase(), 210, 192);
+
+		// --- Large business name centered ---
+		ctx.textAlign="center";
+		ctx.font = "bold 42px Arial"; ctx.fillStyle="#202124";
+		ctx.fillText(shop.name, W/2, 265);
+
+		// --- Tagline ---
+		ctx.font = "22px Arial"; ctx.fillStyle="#5F6368";
+		ctx.fillText(lang==="es"?"Tu opinión nos ayuda a mejorar":"Your opinion helps us improve", W/2, 305);
+
+		// --- QR code with white border card ---
+		const qSize = 460, qX = (W-qSize)/2, qY = 340;
+		// Shadow effect
+		ctx.fillStyle = "#E8EAED";
+		ctx.beginPath();
+		ctx.roundRect(qX+6, qY+6, qSize, qSize, 20);
+		ctx.fill();
+		// White card
+		ctx.fillStyle = "#FFFFFF";
+		ctx.strokeStyle = "#DADCE0";
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		ctx.roundRect(qX, qY, qSize, qSize, 20);
+		ctx.fill(); ctx.stroke();
+
+		// Load and draw QR
+		const img = new Image(); img.crossOrigin="anonymous";
+		img.onload = () => {
+			const pad = 30;
+			ctx.drawImage(img, qX+pad, qY+pad, qSize-pad*2, qSize-pad*2);
+
+			// --- Bottom section ---
+			const botY = qY + qSize + 40;
+
+			// Scan instruction pill
+			ctx.fillStyle = "#1A73E8";
+			ctx.beginPath();
+			ctx.roundRect(W/2-200, botY, 400, 60, 30);
+			ctx.fill();
+			ctx.font = "bold 22px Arial"; ctx.fillStyle="#FFFFFF"; ctx.textAlign="center";
+			ctx.fillText(lang==="es"?"📷  Escanea con tu cámara":"📷  Scan with your camera", W/2, botY+38);
+
+			// Two options below
+			const optY = botY + 90;
+			// Option 1 - complaint
+			ctx.fillStyle = "#FEF3F2"; ctx.strokeStyle="#FCA5A5"; ctx.lineWidth=1.5;
+			ctx.beginPath(); ctx.roundRect(60, optY, 310, 80, 14); ctx.fill(); ctx.stroke();
+			ctx.font = "bold 18px Arial"; ctx.fillStyle="#B91C1C"; ctx.textAlign="center";
+			ctx.fillText(lang==="es"?"💬 Tengo una queja":"💬 I have a complaint", 215, optY+32);
+			ctx.font = "14px Arial"; ctx.fillStyle="#6B7280";
+			ctx.fillText(lang==="es"?"→ WhatsApp directo":"→ Direct WhatsApp", 215, optY+56);
+
+			// Option 2 - review
+			ctx.fillStyle = "#F0FDF4"; ctx.strokeStyle="#86EFAC"; ctx.lineWidth=1.5;
+			ctx.beginPath(); ctx.roundRect(430, optY, 310, 80, 14); ctx.fill(); ctx.stroke();
+			ctx.font = "bold 18px Arial"; ctx.fillStyle="#15803D"; ctx.textAlign="center";
+			ctx.fillText(lang==="es"?"⭐ Dejar reseña":"⭐ Leave a review", 585, optY+32);
+			ctx.font = "14px Arial"; ctx.fillStyle="#6B7280";
+			ctx.fillText(lang==="es"?"→ Google Reviews":"→ Google Reviews", 585, optY+56);
+
+			// --- Bottom bar ---
+			ctx.fillStyle = strip;
+			ctx.fillRect(0, H-8, W, 8);
+
+			// Powered by (subtle)
+			ctx.font = "13px Arial"; ctx.fillStyle="#BDC1C6"; ctx.textAlign="center";
+			ctx.fillText("Powered by Goolinext", W/2, H-20);
+
+			// Download
+			const a = document.createElement("a");
+			a.href = canvas.toDataURL("image/png", 1.0);
+			a.download = `${shop.name.replace(/\s+/g,"-")}-google-review-qr.png`;
+			a.click();
+		};
+		img.src = qrApiUrl;
+	};
+
+	return (
+		<div className="space-y-6">
+			{/* Header */}
+			<div className="bg-gradient-to-r from-blue-500/10 to-green-500/10 border border-blue-500/20 rounded-2xl p-5">
+				<div className="flex items-center gap-3 mb-2">
+					<div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+						<svg width="22" height="22" viewBox="0 0 48 48">
+							<path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.1 34.8 29.5 38 24 38c-7.7 0-14-6.3-14-14s6.3-14 14-14c3.4 0 6.5 1.2 8.9 3.2l6.4-6.4C35.2 3.5 29.9 1 24 1 11.3 1 1 11.3 1 24s10.3 23 23 23c12.9 0 22-9.1 22-23 0-1.5-.2-2.7-.5-4z"/>
+							<path fill="#34A853" d="M6.3 14.7l7 5.1C15.2 16 19.3 13 24 13c3.4 0 6.5 1.2 8.9 3.2l6.4-6.4C35.2 3.5 29.9 1 24 1 16.3 1 9.7 5.6 6.3 14.7z"/>
+							<path fill="#FBBC05" d="M24 47c5.7 0 10.9-1.9 14.9-5.1l-6.9-5.7C29.8 38 27 39 24 39c-5.5 0-10.2-3.3-12.2-8L5 36.2C8.5 43 15.7 47 24 47z"/>
+							<path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.5-2.6 4.6-4.8 6l6.9 5.7C42.3 36.7 45 30.8 45 24c0-1.5-.2-2.7-.5-4z"/>
+						</svg>
+					</div>
+					<div>
+						<h2 className="text-lg font-bold text-white">{lang==="es"?"QR de Reputación":"Reputation QR"}</h2>
+						<p className="text-sm text-gray-400">{lang==="es"?"Genera reseñas en Google automáticamente":"Generate Google reviews automatically"}</p>
+					</div>
+				</div>
+			</div>
+
+			{/* WhatsApp config */}
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-3">
+				<div className="flex items-center gap-2 mb-1">
+					<div className="w-7 h-7 rounded-lg bg-green-500/20 flex items-center justify-center">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="#22c55e"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.524 5.845L.057 23.887a.5.5 0 0 0 .616.616l6.04-1.467A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.9a9.888 9.888 0 0 1-5.035-1.375l-.361-.214-3.733.907.923-3.635-.235-.374A9.862 9.862 0 0 1 2.1 12C2.1 6.532 6.532 2.1 12 2.1S21.9 6.532 21.9 12 17.468 21.9 12 21.9z"/></svg>
+					</div>
+					<h3 className="text-sm font-bold text-white">{lang==="es"?"WhatsApp para quejas":"WhatsApp for complaints"}</h3>
+				</div>
+				<p className="text-xs text-gray-500">{lang==="es"?"Cuando un cliente tiene una queja, se le abrirá WhatsApp directo contigo.":"When a client has a complaint, WhatsApp will open directly with you."}</p>
+				{saveError && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg p-2">{saveError}</p>}
+				<div className="flex gap-2">
+					<select value={countryCode} onChange={e=>setCountryCode(e.target.value)}
+						className="px-3 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm">
+						{[
+							{code:"+1",flag:"🇺🇸",label:"US/CA"},
+							{code:"+52",flag:"🇲🇽",label:"MX"},
+							{code:"+34",flag:"🇪🇸",label:"ES"},
+							{code:"+57",flag:"🇨🇴",label:"CO"},
+							{code:"+58",flag:"🇻🇪",label:"VE"},
+							{code:"+53",flag:"🇨🇺",label:"CU"},
+							{code:"+1787",flag:"🇵🇷",label:"PR"},
+							{code:"+54",flag:"🇦🇷",label:"AR"},
+							{code:"+56",flag:"🇨🇱",label:"CL"},
+							{code:"+51",flag:"🇵🇪",label:"PE"},
+							{code:"+593",flag:"🇪🇨",label:"EC"},
+							{code:"+502",flag:"🇬🇹",label:"GT"},
+							{code:"+504",flag:"🇭🇳",label:"HN"},
+							{code:"+503",flag:"🇸🇻",label:"SV"},
+							{code:"+506",flag:"🇨🇷",label:"CR"},
+							{code:"+507",flag:"🇵🇦",label:"PA"},
+							{code:"+809",flag:"🇩🇴",label:"DO"},
+							{code:"+44",flag:"🇬🇧",label:"UK"},
+							{code:"+55",flag:"🇧🇷",label:"BR"},
+							{code:"+39",flag:"🇮🇹",label:"IT"},
+							{code:"+33",flag:"🇫🇷",label:"FR"},
+							{code:"+49",flag:"🇩🇪",label:"DE"},
+						].map(c=>(
+							<option key={c.code} value={c.code}>{c.flag} {c.code} {c.label}</option>
+						))}
+					</select>
+					<input type="tel" value={whatsapp} onChange={e=>setWhatsapp(e.target.value.replace(/\D/g,""))}
+						placeholder="5551234567"
+						className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-green-500 text-sm font-mono" />
+					<button type="button" onClick={()=>saveMutation.mutate()}
+						disabled={!whatsapp.trim()||saveMutation.isPending}
+						className={`px-4 py-3 rounded-xl text-sm font-bold transition-all ${saved?"bg-green-500 text-white":"bg-amber-500 text-black disabled:opacity-40"}`}>
+						{saveMutation.isPending?"...":(lang==="es"?"Guardar y Generar QR":"Save & Generate QR")}
+					</button>
+				</div>
+			</div>
+
+			{/* QR Preview & Download - only show after saving */}
+			{(showQR || savedWhatsapp) && <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-4">
+				<h3 className="text-sm font-bold text-white flex items-center gap-2">
+					<div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
+					</div>
+					{lang==="es"?"Código QR profesional":"Professional QR code"}
+				</h3>
+				<p className="text-xs text-gray-500">
+					{lang==="es"
+						?"Imprime este código y ponlo en tu negocio. Cuando la gente lo escanee verá dos opciones: queja o reseña en Google."
+						:"Print this code and place it in your business. When people scan it they'll see two options: complaint or Google review."}
+				</p>
+
+				{/* QR Preview */}
+				<div className="flex justify-center">
+					<div className="bg-white rounded-2xl p-4 shadow-lg" style={{maxWidth:200}}>
+						<div className="flex items-center justify-center gap-1 mb-2">
+							<span style={{color:"#4285F4",fontWeight:800,fontSize:14}}>G</span>
+							<span style={{color:"#EA4335",fontWeight:800,fontSize:14}}>o</span>
+							<span style={{color:"#FBBC05",fontWeight:800,fontSize:14}}>o</span>
+							<span style={{color:"#4285F4",fontWeight:800,fontSize:14}}>g</span>
+							<span style={{color:"#34A853",fontWeight:800,fontSize:14}}>l</span>
+							<span style={{color:"#EA4335",fontWeight:800,fontSize:14}}>e</span>
+							<span style={{color:"#5f6368",fontSize:12,marginLeft:2}}>Review</span>
+						</div>
+						<img src={qrApiUrl} alt="QR Code" style={{width:"100%",display:"block",borderRadius:8}} />
+						<div className="flex justify-center gap-0.5 mt-2">
+							{["★","★","★","★","★"].map((s,i)=><span key={i} style={{color:"#FBBC05",fontSize:14}}>{s}</span>)}
+						</div>
+						<p style={{textAlign:"center",fontSize:9,color:"#9ca3af",marginTop:4}}>{lang==="es"?"Escanea y califica":"Scan and rate"}</p>
+					</div>
+				</div>
+
+				{/* URL preview */}
+				<div className="bg-gray-800/50 rounded-xl p-3">
+					<p className="text-xs text-gray-500 mb-1">{lang==="es"?"URL de tu página":"Your page URL"}</p>
+					<p className="text-xs text-green-400 font-mono break-all">{reviewUrl}</p>
+				</div>
+
+				{/* Download button */}
+				<button type="button" onClick={downloadQR}
+					className="w-full py-4 bg-gradient-to-r from-blue-500 to-green-500 text-white font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 text-sm">
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+					{lang==="es"?"Descargar QR para imprimir":"Download QR to print"}
+				</button>
+
+				{/* Instructions */}
+				<div className="space-y-2">
+					<p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{lang==="es"?"Cómo funciona":"How it works"}</p>
+					{[
+						lang==="es"?"1. Imprime el QR y ponlo visible en tu negocio":"1. Print the QR and place it visibly in your business",
+						lang==="es"?"2. El cliente lo escanea con su teléfono":"2. The client scans it with their phone",
+						lang==="es"?"3. Elige: queja (te contacta por WhatsApp) o reseña (va a Google)":"3. Chooses: complaint (contacts you on WhatsApp) or review (goes to Google)",
+						lang==="es"?"4. Más reseñas = más clientes nuevos":"4. More reviews = more new clients",
+					].map((step,i)=>(
+						<p key={i} className="text-xs text-gray-500 flex items-start gap-2">
+							<span className="text-green-400 flex-shrink-0">✓</span>{step}
+						</p>
+					))}
+				</div>
+			</div>}
+
+			{/* Prompt to save first */}
+			{!showQR && !savedWhatsapp && (
+				<div className="bg-gray-800/40 border border-gray-700 rounded-2xl p-6 text-center space-y-2">
+					<div className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center mx-auto">
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+					</div>
+					<p className="text-sm font-semibold text-white">{lang==="es"?"Agrega tu WhatsApp primero":"Add your WhatsApp first"}</p>
+					<p className="text-xs text-gray-500">{lang==="es"?"Guarda tu número para generar el código QR":"Save your number to generate the QR code"}</p>
+				</div>
+			)}
+		</div>
+	);
+}
+
+function RetentionView({ shopId, lang }: { shopId: number; lang: Lang }) {
+	const t = dash[lang];
+	const queryClient = useQueryClient();
+	const [search, setSearch] = useState("");
+	const [noteInput, setNoteInput] = useState<Record<number, string>>({});
+	const [expandedId, setExpandedId] = useState<number | null>(null);
+
+	const { data: clients = [], isLoading } = useQuery({
+		queryKey: ["inactiveClients", shopId],
+		queryFn: () => getInactiveClients(),
+	});
+
+	const statusMutation = useMutation({
+		mutationFn: (args: { clientId: number; status: string; note?: string }) =>
+			updateClientCallStatus({ data: args }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inactiveClients", shopId] }),
+	});
+
+	const pending = clients.filter((c: any) => c.callStatus === "pending" || !c.callStatus);
+	const answered = clients.filter((c: any) => c.callStatus === "answered");
+	const noAnswer = clients.filter((c: any) => c.callStatus === "no_answer");
+
+	const filtered = (list: any[]) => list.filter((c: any) =>
+		c.name?.toLowerCase().includes(search.toLowerCase()) ||
+		c.phone?.includes(search)
+	);
+
+	const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString(lang === "es" ? "es-US" : "en-US", { month: "short", day: "numeric", year: "numeric" });
+
+	const ClientCard = ({ client, showActions }: { client: any; showActions: boolean }) => (
+		<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
+			<div className="flex items-start justify-between gap-3">
+				<div className="min-w-0 flex-1">
+					<p className="font-bold text-white text-sm truncate">{client.name}</p>
+					<a href={`tel:${client.phone}`} className="text-amber-400 text-sm font-mono">{client.phone}</a>
+					<div className="flex items-center gap-3 mt-1">
+						<span className="text-xs text-gray-500">{lang === "es" ? "Última visita:" : "Last visit:"} <span className="text-gray-400">{formatDate(client.lastVisit)}</span></span>
+						<span className={`text-xs font-bold px-2 py-0.5 rounded-full ${client.daysSince > 60 ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}>
+							{client.daysSince} {lang === "es" ? "días" : "days"}
+						</span>
+					</div>
+					<p className="text-xs text-gray-600 mt-0.5">{client.totalVisits} {lang === "es" ? "visitas totales" : "total visits"}</p>
+				</div>
+				<a href={`tel:${client.phone}`}
+					className="flex-shrink-0 w-9 h-9 rounded-full bg-green-500/15 border border-green-500/25 flex items-center justify-center text-green-400 hover:bg-green-500/25 transition-all"
+					title={lang === "es" ? "Llamar" : "Call"}>
+					📞
+				</a>
+			</div>
+
+			{/* Note */}
+			{client.note && (
+				<p className="text-xs text-gray-500 bg-gray-800/50 rounded-lg px-3 py-2">📝 {client.note}</p>
+			)}
+
+			{showActions && (
+				<div className="space-y-2">
+					<input
+						type="text"
+						value={noteInput[client.clientId] ?? ""}
+						onChange={e => setNoteInput(p => ({ ...p, [client.clientId]: e.target.value }))}
+						placeholder={lang === "es" ? "Agregar nota..." : "Add note..."}
+						className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-600 text-xs focus:outline-none focus:border-amber-500"
+					/>
+					<div className="flex gap-2">
+						<button type="button"
+							onClick={() => statusMutation.mutate({ clientId: client.clientId, status: "answered", note: noteInput[client.clientId] })}
+							disabled={statusMutation.isPending}
+							className="flex-1 py-2 bg-green-500/15 text-green-400 border border-green-500/25 rounded-lg text-xs font-semibold hover:bg-green-500/25 transition-all">
+							✅ {lang === "es" ? "Respondió" : "Answered"}
+						</button>
+						<button type="button"
+							onClick={() => statusMutation.mutate({ clientId: client.clientId, status: "no_answer", note: noteInput[client.clientId] })}
+							disabled={statusMutation.isPending}
+							className="flex-1 py-2 bg-red-500/15 text-red-400 border border-red-500/25 rounded-lg text-xs font-semibold hover:bg-red-500/25 transition-all">
+							📵 {lang === "es" ? "No respondió" : "No answer"}
+						</button>
+					</div>
+				</div>
+			)}
+
+			{!showActions && client.callStatus !== "pending" && (
+				<button type="button"
+					onClick={() => statusMutation.mutate({ clientId: client.clientId, status: "pending" })}
+					className="text-xs text-gray-600 hover:text-gray-400 transition-all">
+					↩ {lang === "es" ? "Mover a pendiente" : "Move to pending"}
+				</button>
+			)}
+		</div>
+	);
+
+	const downloadCSV = () => {
+		const header = lang === "es"
+			? "Estado,Nombre,Teléfono,Última visita,Días sin venir,Visitas totales,Nota"
+			: "Status,Name,Phone,Last visit,Days away,Total visits,Note";
+		const statusLabel = (s: string) => {
+			if (lang === "es") return s === "answered" ? "Respondió" : s === "no_answer" ? "No respondió" : "Por llamar";
+			return s === "answered" ? "Answered" : s === "no_answer" ? "No answer" : "To call";
+		};
+		const ordered = [...pending, ...answered, ...noAnswer];
+		const rows = ordered.map((c: any) =>
+			[statusLabel(c.callStatus), `"${c.name}"`, c.phone, c.lastVisit, c.daysSince, c.totalVisits, `"${c.note || ""}"`].join(",")
+		);
+		const csv = [header, ...rows].join("\n");
+		const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = `retencion-clientes-${new Date().toISOString().split("T")[0]}.csv`;
+		a.click();
+	};
+
+	if (isLoading) return (
+		<div className="flex justify-center py-12">
+			<div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+		</div>
+	);
+
+	return (
+		<div className="space-y-6">
+			{/* Header */}
+			<div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-5">
+				<div className="flex items-start justify-between flex-wrap gap-3">
+					<div>
+						<h2 className="text-lg font-bold text-white">{lang === "es" ? "Control de Retención" : "Retention Control"}</h2>
+						<p className="text-sm text-gray-400 mt-1">{lang === "es" ? "Clientes sin visitar en 30+ días" : "Clients who haven't visited in 30+ days"}</p>
+					</div>
+					<div className="flex flex-col items-end gap-3">
+						<div className="flex gap-3 text-center">
+							<div className="bg-gray-900/60 rounded-xl px-4 py-2">
+								<p className="text-2xl font-bold text-amber-400">{pending.length}</p>
+								<p className="text-xs text-gray-500">{lang === "es" ? "Por llamar" : "To call"}</p>
+							</div>
+							<div className="bg-gray-900/60 rounded-xl px-4 py-2">
+								<p className="text-2xl font-bold text-green-400">{answered.length}</p>
+								<p className="text-xs text-gray-500">{lang === "es" ? "Respondieron" : "Answered"}</p>
+							</div>
+							<div className="bg-gray-900/60 rounded-xl px-4 py-2">
+								<p className="text-2xl font-bold text-red-400">{noAnswer.length}</p>
+								<p className="text-xs text-gray-500">{lang === "es" ? "No respondió" : "No answer"}</p>
+							</div>
+						</div>
+						{clients.length > 0 && (
+							<button type="button" onClick={downloadCSV}
+								className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-gray-300 hover:bg-gray-700 transition-all">
+								⬇ {lang === "es" ? "Exportar CSV" : "Export CSV"}
+							</button>
+						)}
+					</div>
+				</div>
+			</div>
+
+			{/* Search */}
+			<input type="text" value={search} onChange={e => setSearch(e.target.value)}
+				placeholder={lang === "es" ? "Buscar por nombre o teléfono..." : "Search by name or phone..."}
+				className="w-full px-4 py-3 bg-gray-900/60 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 text-sm" />
+
+			{clients.length === 0 ? (
+				<div className="text-center py-12">
+					<p className="text-4xl mb-3">🎉</p>
+					<p className="text-white font-bold">{lang === "es" ? "¡Sin clientes inactivos!" : "No inactive clients!"}</p>
+					<p className="text-gray-500 text-sm mt-1">{lang === "es" ? "Todos tus clientes han visitado en los últimos 30 días." : "All your clients have visited in the last 30 days."}</p>
+				</div>
+			) : (
+				<div className="space-y-6">
+					{/* COLUMN: To Call */}
+					{filtered(pending).length > 0 && (
+						<div>
+							<div className="flex items-center gap-2 mb-3">
+								<div className="w-2 h-2 rounded-full bg-amber-400" />
+								<h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider">
+									📋 {lang === "es" ? "Por llamar" : "To call"} ({filtered(pending).length})
+								</h3>
+							</div>
+							<div className="space-y-3">
+								{filtered(pending).map((c: any) => <ClientCard key={c.clientId} client={c} showActions={true} />)}
+							</div>
+						</div>
+					)}
+
+					{/* COLUMN: Answered */}
+					{filtered(answered).length > 0 && (
+						<div>
+							<div className="flex items-center gap-2 mb-3">
+								<div className="w-2 h-2 rounded-full bg-green-400" />
+								<h3 className="text-sm font-bold text-green-400 uppercase tracking-wider">
+									✅ {lang === "es" ? "Llamó y respondió" : "Called & answered"} ({filtered(answered).length})
+								</h3>
+							</div>
+							<div className="space-y-3">
+								{filtered(answered).map((c: any) => <ClientCard key={c.clientId} client={c} showActions={false} />)}
+							</div>
+						</div>
+					)}
+
+					{/* COLUMN: No Answer */}
+					{filtered(noAnswer).length > 0 && (
+						<div>
+							<div className="flex items-center gap-2 mb-3">
+								<div className="w-2 h-2 rounded-full bg-red-400" />
+								<h3 className="text-sm font-bold text-red-400 uppercase tracking-wider">
+									📵 {lang === "es" ? "No respondió" : "No answer"} ({filtered(noAnswer).length})
+								</h3>
+							</div>
+							<div className="space-y-3">
+								{filtered(noAnswer).map((c: any) => <ClientCard key={c.clientId} client={c} showActions={false} />)}
+							</div>
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function ReportsView({ shopId, lang }: { shopId: number; lang: "en" | "es" }) {
+	const today = new Date().toISOString().split("T")[0];
+	const [selectedDate, setSelectedDate] = useState(today);
+	const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+	const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+	const [view, setView] = useState<"day" | "month" | "year">("day");
+
+	const { data: dailyReport, isLoading: dailyLoading } = useQuery({
+		queryKey: ["dailyReport", shopId, selectedDate],
+		queryFn: () => getDailyReport({ data: { shopId, date: selectedDate } }),
+		enabled: view === "day",
+	});
+
+	const { data: monthlyReport, isLoading: monthlyLoading } = useQuery({
+		queryKey: ["monthlyReport", shopId, selectedYear, selectedMonth],
+		queryFn: () => getMonthlyReport({ data: { shopId, year: selectedYear, month: selectedMonth } }),
+		enabled: view === "month",
+	});
+
+	const { data: yearlyReport, isLoading: yearlyLoading } = useQuery({
+		queryKey: ["yearlyReport", shopId, selectedYear],
+		queryFn: () => getYearlyReport({ data: { shopId, year: selectedYear } }),
+		enabled: view === "year",
+	});
+
+	const months = lang === "es"
+		? ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+		: ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+	const downloadCSV = () => {
+		if (view === "day" && dailyReport?.visits) {
+			const rows = [
+				["Client","Barber","Status","Amount","Time"],
+				...dailyReport.visits.map((v: any) => [
+					v.clientName,
+					v.barberName,
+					v.status,
+					v.amountPaid ? `${v.amountPaid.toFixed(2)}` : "$0.00",
+					new Date(v.createdAt).toLocaleTimeString(),
+				])
+			];
+			const csv = rows.map(r => r.join(",")).join("\n");
+			const blob = new Blob([csv], { type: "text/csv" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `report-${selectedDate}.csv`;
+			a.click();
+		} else if (view === "month" && monthlyReport?.visits) {
+			const rows = [
+				["Date","Client","Barber","Status","Amount"],
+				// Barber summary section
+				...(monthlyReport.byBarber ? [
+					[lang==="es"?"GANANCIAS POR EMPLEADO":"EARNINGS BY STAFF","","","",""],
+					[lang==="es"?"Empleado":"Staff",lang==="es"?"Clientes":"Clients","Total","",""],
+					...Object.entries(monthlyReport.byBarber).sort(([,a]: any,[,b]: any) => (b as any).revenue - (a as any).revenue)
+						.map(([name, data]: any) => [name, data.count, `${(data.revenue||0).toFixed(2)}`,"",""]),
+					["TOTAL","",`${(monthlyReport.totalRevenue||0).toFixed(2)}`,"",""],
+					["","","","",""],
+					[lang==="es"?"DETALLE DE VISITAS":"VISIT DETAILS","","","",""],
+				] : []),
+				...monthlyReport.visits.map((v: any) => [
+					new Date(v.createdAt).toLocaleDateString(),
+					v.clientName,
+					v.barberName,
+					v.status,
+					v.amountPaid ? `${v.amountPaid.toFixed(2)}` : "$0.00",
+				])
+			];
+			const csv = rows.map(r => r.join(",")).join("\n");
+			const blob = new Blob([csv], { type: "text/csv" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `report-${selectedYear}-${selectedMonth}.csv`;
+			a.click();
+		} else if (view === "year" && yearlyReport?.visits) {
+			const rows = [
+				["Date","Client","Barber","Status","Amount"],
+				// Barber summary section
+				...(yearlyReport.byBarber ? [
+					[lang==="es"?"GANANCIAS POR EMPLEADO":"EARNINGS BY STAFF","","","",""],
+					[lang==="es"?"Empleado":"Staff",lang==="es"?"Clientes":"Clients","Total","",""],
+					...Object.entries(yearlyReport.byBarber).sort(([,a]: any,[,b]: any) => (b as any).revenue - (a as any).revenue)
+						.map(([name, data]: any) => [name, data.count, `${(data.revenue||0).toFixed(2)}`,"",""]),
+					["TOTAL","",`${(yearlyReport.totalRevenue||0).toFixed(2)}`,"",""],
+					["","","","",""],
+					[lang==="es"?"DETALLE DE VISITAS":"VISIT DETAILS","","","",""],
+				] : []),
+				...yearlyReport.visits.map((v: any) => [new Date(v.createdAt).toLocaleDateString(), v.clientName, v.barberName, v.status, v.amountPaid ? `${v.amountPaid.toFixed(2)}` : "$0.00"])
+			];
+			const csv = rows.map(r => r.join(",")).join("\n");
+			const blob = new Blob([csv], { type: "text/csv" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `report-${selectedYear}.csv`;
+			a.click();
+		}
+	};
+
+	return (
+		<div className="space-y-6">
+			{/* Header */}
+			<div className="flex items-center justify-between flex-wrap gap-3">
+				<h2 className="text-xl font-bold text-white flex items-center gap-2">
+					<BarChart2 className="w-5 h-5 text-amber-400" />
+					{lang === "es" ? "Reportes" : "Reports"}
+				</h2>
+				<button type="button" onClick={downloadCSV} className="flex items-center gap-2 px-4 py-2 bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-xl text-sm font-semibold hover:bg-amber-500/25">
+					<Database className="w-4 h-4" />
+					{lang === "es" ? "Descargar CSV" : "Download CSV"}
+				</button>
+			</div>
+
+			{/* View toggle */}
+			<div className="flex gap-2">
+				<button type="button" onClick={() => setView("day")} className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${view==="day" ? "bg-amber-500 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+					{lang === "es" ? "Por Día" : "Daily"}
+				</button>
+				<button type="button" onClick={() => setView("month")} className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${view==="month" ? "bg-amber-500 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+					{lang === "es" ? "Por Mes" : "Monthly"}
+				</button>
+				<button type="button" onClick={() => setView("year")} className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${view==="year" ? "bg-amber-500 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+					{lang === "es" ? "Por Año" : "Yearly"}
+				</button>
+			</div>
+
+			{/* Date selector */}
+			{view === "day" ? (
+				<div>
+					<label className="block text-sm text-gray-400 mb-1">{lang === "es" ? "Seleccionar día" : "Select day"}</label>
+					<input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+						className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-amber-500" />
+				</div>
+			) : view === "year" ? (
+				<div>
+					<label className="block text-sm text-gray-400 mb-1">{lang === "es" ? "Seleccionar año" : "Select year"}</label>
+					<select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-amber-500">
+						{[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+					</select>
+				</div>
+			) : (
+				<div className="flex gap-3">
+					<select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}
+						className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-amber-500">
+						{months.map((m,i) => <option key={i+1} value={i+1}>{m}</option>)}
+					</select>
+					<select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}
+						className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-amber-500">
+						{[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+					</select>
+				</div>
+			)}
+
+			{/* Daily Report */}
+			{view === "day" && (
+				<div className="space-y-4">
+					{dailyLoading ? (
+						<div className="text-gray-500 text-sm">{lang === "es" ? "Cargando..." : "Loading..."}</div>
+					) : dailyReport ? (
+						<>
+							{/* Summary cards */}
+							<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+								{[
+									{ label: lang==="es"?"Clientes":"Clients", value: dailyReport.totalCompleted, color:"text-white" },
+									{ label: lang==="es"?"Cancelados":"Cancelled", value: dailyReport.totalCancelled, color:"text-red-400" },
+									{ label: lang==="es"?"No se presentaron":"No-shows", value: (dailyReport as any).totalNoShows ?? 0, color:"text-orange-400" },
+									{ label: lang==="es"?"Ingreso total":"Total Revenue", value: `${(dailyReport.totalRevenue??0).toFixed(2)}`, color:"text-green-400" },
+								].map((s,i) => (
+									<div key={i} className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4">
+										<p className="text-xs text-gray-500 mb-1">{s.label}</p>
+										<p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+									</div>
+								))}
+							</div>
+
+							{/* By barber */}
+							{Object.keys(dailyReport.byBarber).length > 0 && (
+								<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5">
+									<h3 className="text-sm font-semibold text-gray-300 mb-3">{lang==="es"?"Por empleado":"By staff member"}</h3>
+									<div className="space-y-2">
+										{Object.entries(dailyReport.byBarber).map(([name, data]: [string, any]) => (
+											<div key={name} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+												<span className="text-white font-medium">{name}</span>
+												<div className="flex items-center gap-4">
+													<span className="text-gray-400 text-sm">{data.count} {lang==="es"?(data.count===1?"cliente":"clientes"):(data.count===1?"client":"clients")}</span>
+													<span className="text-green-400 font-bold">${data.revenue.toFixed(2)}</span>
+												</div>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+
+							{/* Full visit list */}
+							<div className="bg-gray-900/60 border border-gray-800 rounded-2xl overflow-hidden">
+								<div className="px-5 py-3 border-b border-gray-800">
+									{/* Barber earnings breakdown */}
+									{dailyReport.byBarber && Object.keys(dailyReport.byBarber).length > 0 && (
+										<div className="px-5 py-4 border-b border-gray-800">
+											<p className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3">💰 {lang === "es" ? "Ganancias por empleado" : "Earnings by staff"}</p>
+											<div className="space-y-2">
+												{Object.entries(dailyReport.byBarber).sort(([,a]: any,[,b]: any) => (b as any).revenue - (a as any).revenue).map(([name, data]: any) => (
+													<div key={name} className="flex items-center gap-3">
+														<div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-400 flex-shrink-0">{name[0]?.toUpperCase()}</div>
+														<div className="flex-1 min-w-0">
+															<div className="flex justify-between items-baseline mb-1">
+																<span className="text-white text-sm font-medium truncate">{name}</span>
+																<span className="text-green-400 font-bold text-sm ml-2 flex-shrink-0">${(data.revenue||0).toFixed(2)}</span>
+															</div>
+															<div className="flex items-center gap-2">
+																<div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+																	<div className="h-full bg-gradient-to-r from-amber-500 to-green-500 rounded-full" style={{width:`${dailyReport.totalRevenue>0?(data.revenue/dailyReport.totalRevenue*100):0}%`}}/>
+																</div>
+																<span className="text-gray-600 text-xs flex-shrink-0">{data.count} {lang==="es"?"clientes":"clients"}</span>
+															</div>
+														</div>
+													</div>
+												))}
+											</div>
+										</div>
+									)}
+									<h3 className="text-sm font-semibold text-gray-300">{lang==="es"?"Lista completa":"Full list"}</h3>
+								</div>
+								<div className="divide-y divide-gray-800/50">
+									{dailyReport.visits.length === 0 && (
+										<p className="px-5 py-6 text-gray-600 text-sm text-center">{lang==="es"?"Sin registros este día":"No records this day"}</p>
+									)}
+									{dailyReport.visits.map((v: any) => (
+										<div key={v.visitId} className="px-5 py-3 flex items-center justify-between">
+											<div>
+												<p className="text-white font-medium text-sm">{v.clientName}</p>
+												<p className="text-gray-500 text-xs">{v.barberName} · {new Date(v.createdAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</p>
+											</div>
+											<div className="flex items-center gap-3">
+												<span className={`text-xs px-2 py-1 rounded-full font-medium ${v.status==="completed"?"bg-green-500/15 text-green-400":v.status==="cancelled"?"bg-red-500/15 text-red-400":v.status==="no_show"?"bg-orange-500/15 text-orange-400":"bg-amber-500/15 text-amber-400"}`}>
+													{v.status==="completed"?(lang==="es"?"Completado":"Completed"):v.status==="cancelled"?(lang==="es"?"Cancelado":"Cancelled"):v.status==="no_show"?(lang==="es"?"No llegó":"No-show"):(lang==="es"?"En espera":"Waiting")}
+												</span>
+												<span className="text-green-400 font-bold text-sm">{v.amountPaid ? `${v.amountPaid.toFixed(2)}` : "—"}</span>
+											</div>
+										</div>
+									))}
+								</div>
+							</div>
+						</>
+					) : null}
+				</div>
+			)}
+
+			{/* Yearly Report */}
+			{view === "year" && (
+				<div className="space-y-4">
+					{yearlyLoading ? <p className="text-gray-500 text-sm">{lang==="es"?"Cargando...":"Loading..."}</p> : yearlyReport ? (
+						<>
+							<div className="grid grid-cols-2 gap-3">
+								<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4">
+									<p className="text-xs text-gray-500 mb-1">{lang==="es"?"Total clientes":"Total clients"}</p>
+									<p className="text-2xl font-bold text-white">{yearlyReport.totalClients}</p>
+								</div>
+								<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4">
+									<p className="text-xs text-gray-500 mb-1">{lang==="es"?"Ingreso del año":"Yearly revenue"}</p>
+									<p className="text-2xl font-bold text-green-400">${(yearlyReport.totalRevenue??0).toFixed(2)}</p>
+								</div>
+							</div>
+							{/* Barber earnings by staff */}
+							{yearlyReport.byBarber && Object.keys(yearlyReport.byBarber).length > 0 && (
+								<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5">
+									<p className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-4">💰 {lang === "es" ? "Ganancias por empleado" : "Earnings by staff"}</p>
+									<div className="space-y-3">
+										{Object.entries(yearlyReport.byBarber).sort(([,a]: any,[,b]: any) => (b as any).revenue - (a as any).revenue).map(([name, data]: any) => (
+											<div key={name} className="flex items-center gap-3">
+												<div className="w-8 h-8 rounded-full bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-400 flex-shrink-0">{name[0]?.toUpperCase()}</div>
+												<div className="flex-1 min-w-0">
+													<div className="flex justify-between items-baseline mb-1">
+														<span className="text-white text-sm font-semibold truncate">{name}</span>
+														<span className="text-green-400 font-bold text-sm ml-2 flex-shrink-0">${(data.revenue||0).toFixed(2)}</span>
+													</div>
+													<div className="flex items-center gap-2">
+														<div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+															<div className="h-full bg-gradient-to-r from-amber-500 to-green-500 rounded-full" style={{width: yearlyReport.totalRevenue>0 ? (data.revenue/yearlyReport.totalRevenue*100).toFixed(0)+"%" : "0%"}}/>
+														</div>
+														<span className="text-gray-600 text-xs flex-shrink-0">{data.count} {lang==="es"?"clientes":"clients"}</span>
+													</div>
+												</div>
+											</div>
+										))}
+									</div>
+									<div className="mt-4 pt-3 border-t border-gray-800 flex justify-between">
+										<span className="text-gray-400 text-sm font-semibold">Total</span>
+										<span className="text-green-400 font-bold text-lg">${(yearlyReport.totalRevenue??0).toFixed(2)}</span>
+									</div>
+								</div>
+							)}
+
+
+							<div className="bg-gray-900/60 border border-gray-800 rounded-2xl overflow-hidden">
+								<div className="px-5 py-3 border-b border-gray-800"><h3 className="text-sm font-semibold text-gray-300">{lang==="es"?"Mes a mes":"Month by month"}</h3></div>
+								<div className="divide-y divide-gray-800/50">
+									{Object.entries(yearlyReport.byMonth).map(([month, data]: [string,any]) => (
+										<div key={month} className="px-5 py-3 flex justify-between">
+											<div>
+												<p className="text-white font-medium text-sm">{months[Number(month)-1]}</p>
+												<p className="text-gray-500 text-xs">{data.clients} {lang==="es"?"clientes":"clients"}</p>
+											</div>
+											<span className={`font-bold ${data.revenue>0?"text-green-400":"text-gray-600"}`}>${data.revenue.toFixed(2)}</span>
+										</div>
+									))}
+								</div>
+							</div>
+						</>
+					) : null}
+				</div>
+			)}
+
+			{/* Monthly Report */}
+			{view === "month" && (
+				<div className="space-y-4">
+					{monthlyLoading ? (
+						<div className="text-gray-500 text-sm">{lang === "es" ? "Cargando..." : "Loading..."}</div>
+					) : monthlyReport ? (
+						<>
+							{/* Monthly summary */}
+							<div className="grid grid-cols-2 gap-3">
+								<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4">
+									<p className="text-xs text-gray-500 mb-1">{lang==="es"?"Total clientes":"Total clients"}</p>
+									<p className="text-2xl font-bold text-white">{monthlyReport.totalClients}</p>
+								</div>
+								<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4">
+									<p className="text-xs text-gray-500 mb-1">{lang==="es"?"Ingreso del mes":"Monthly revenue"}</p>
+									<p className="text-2xl font-bold text-green-400">${(monthlyReport.totalRevenue??0).toFixed(2)}</p>
+								</div>
+							</div>
+
+							{/* Barber earnings by staff */}
+							{monthlyReport.byBarber && Object.keys(monthlyReport.byBarber).length > 0 && (
+								<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5">
+									<p className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-4">💰 {lang === "es" ? "Ganancias por empleado" : "Earnings by staff"}</p>
+									<div className="space-y-3">
+										{Object.entries(monthlyReport.byBarber).sort(([,a]: any,[,b]: any) => (b as any).revenue - (a as any).revenue).map(([name, data]: any) => (
+											<div key={name} className="flex items-center gap-3">
+												<div className="w-8 h-8 rounded-full bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-400 flex-shrink-0">{name[0]?.toUpperCase()}</div>
+												<div className="flex-1 min-w-0">
+													<div className="flex justify-between items-baseline mb-1">
+														<span className="text-white text-sm font-semibold truncate">{name}</span>
+														<span className="text-green-400 font-bold text-sm ml-2 flex-shrink-0">${(data.revenue||0).toFixed(2)}</span>
+													</div>
+													<div className="flex items-center gap-2">
+														<div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+															<div className="h-full bg-gradient-to-r from-amber-500 to-green-500 rounded-full" style={{width: monthlyReport.totalRevenue>0 ? (data.revenue/monthlyReport.totalRevenue*100).toFixed(0)+"%" : "0%"}}/>
+														</div>
+														<span className="text-gray-600 text-xs flex-shrink-0">{data.count} {lang==="es"?"clientes":"clients"}</span>
+													</div>
+												</div>
+											</div>
+										))}
+									</div>
+									<div className="mt-4 pt-3 border-t border-gray-800 flex justify-between">
+										<span className="text-gray-400 text-sm font-semibold">Total</span>
+										<span className="text-green-400 font-bold text-lg">${(monthlyReport.totalRevenue??0).toFixed(2)}</span>
+									</div>
+								</div>
+							)}
+
+							{/* Day by day breakdown */}
+							<div className="bg-gray-900/60 border border-gray-800 rounded-2xl overflow-hidden">
+								<div className="px-5 py-3 border-b border-gray-800">
+									<h3 className="text-sm font-semibold text-gray-300">{lang==="es"?"Resumen por día":"Day by day"}</h3>
+								</div>
+								<div className="divide-y divide-gray-800/50">
+									{Object.entries(monthlyReport.byDay).length === 0 && (
+										<p className="px-5 py-6 text-gray-600 text-sm text-center">{lang==="es"?"Sin registros este mes":"No records this month"}</p>
+									)}
+									{Object.entries(monthlyReport.byDay).sort().map(([date, data]: [string, any]) => (
+										<div key={date} className="px-5 py-3 flex items-center justify-between">
+											<div>
+												<p className="text-white font-medium text-sm">{new Date(date+"T12:00:00").toLocaleDateString(lang==="es"?"es-US":"en-US",{weekday:"short",month:"short",day:"numeric"})}</p>
+												<p className="text-gray-500 text-xs">{data.clients} {lang==="es"?"clientes":"clients"} · {data.cancelled} {lang==="es"?"cancelados":"cancelled"}</p>
+											</div>
+											<span className="text-green-400 font-bold">${data.revenue.toFixed(2)}</span>
+										</div>
+									))}
+								</div>
+							</div>
+						</>
+					) : null}
+				</div>
+			)}
+		</div>
 	);
 }

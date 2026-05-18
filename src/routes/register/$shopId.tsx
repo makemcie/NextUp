@@ -79,6 +79,8 @@ function RegisterPage() {
 	const [email, setEmail] = useState("");
 	const [smsConsented, setSmsConsented] = useState(false);
 	const [selectedBarber, setSelectedBarber] = useState<number | null>(null);
+	const [groupSize, setGroupSize] = useState(1);
+	const [groupNames, setGroupNames] = useState<string[]>([]);
 	const [result, setResult] = useState<{
 		visitId: number;
 		welcomeMessage: string | null;
@@ -86,32 +88,51 @@ function RegisterPage() {
 		queuePosition: number;
 		barberName: string;
 		alreadyInQueue?: boolean;
+		shopGoogleReviewLink?: string | null;
+		groupResults?: Array<{ name: string; position: number; visitId: number }>;
 	} | null>(null);
 
 	const mutation = useMutation({
-		mutationFn: () =>
-			registerVisit({
-				data: {
-					shopId: shopIdNum,
-					name,
-					phone,
-					email: email || undefined,
-					barberId: selectedBarber as number,
-					smsConsented,
-				},
-			}),
-		onSuccess: (data) => {
-			if (data?.alreadyInQueue) {
-				// Client already in queue — show their position
+		mutationFn: async () => {
+			const allNames = [name, ...groupNames].slice(0, groupSize);
+			const results = [];
+			for (let i = 0; i < allNames.length; i++) {
+				const personName = allNames[i];
+				const r = await registerVisit({
+					data: {
+						shopId: shopIdNum,
+						name: personName,
+						phone,
+						email: i === 0 ? (email || undefined) : undefined,
+						barberId: selectedBarber as number,
+						smsConsented,
+						groupMember: i > 0,
+					},
+				});
+				results.push({ name: personName, ...r });
+			}
+			return results;
+		},
+		onSuccess: (results) => {
+			const first = results[0];
+			if (first?.alreadyInQueue) {
 				setResult({
-					visitId: data.visitId,
+					visitId: first.visitId,
 					shopName: shop?.name ?? null,
-					queuePosition: data.queuePosition ?? 1,
+					queuePosition: first.queuePosition ?? 1,
 					barberName: "",
 					alreadyInQueue: true,
 				});
 			} else {
-				setResult(data);
+					setResult({
+					...first,
+					shopGoogleReviewLink: shop?.googleReviewLink ?? null,
+					groupResults: results.length > 1 ? results.map((r: any, i: number) => ({
+						name: [name, ...groupNames][i] ?? "",
+						position: r.queuePosition ?? i + 1,
+						visitId: r.visitId,
+					})) : undefined,
+				});
 			}
 			setStep(3);
 		},
@@ -237,12 +258,25 @@ function RegisterPage() {
 								<input
 									id="reg-phone"
 									type="tel"
+									inputMode="numeric"
 									value={phone}
-									onChange={(e) => setPhone(e.target.value)}
+									onChange={(e) => {
+										const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+										setPhone(digits);
+									}}
 									placeholder={t.phonePlaceholder}
-									className="w-full px-4 py-3.5 bg-gray-800/80 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 text-base"
+									maxLength={10}
+									className={`w-full px-4 py-3.5 bg-gray-800/80 border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-base ${phone.length > 0 && phone.length < 10 ? "border-red-500/50 focus:border-red-500" : "border-gray-700 focus:border-amber-500"}`}
 									autoComplete="tel"
 								/>
+								{phone.length > 0 && phone.length < 10 && (
+									<p className="text-red-400 text-xs mt-1 flex items-center gap-1">
+										{lang === "es" ? `Faltan ${10 - phone.length} dígitos` : `${10 - phone.length} digits remaining`}
+									</p>
+								)}
+								{phone.length === 10 && (
+									<p className="text-green-400 text-xs mt-1">✓ {lang === "es" ? "Teléfono completo" : "Phone complete"}</p>
+								)}
 							</div>
 							<div>
 								<label
@@ -265,6 +299,43 @@ function RegisterPage() {
 									autoComplete="email"
 								/>
 							</div>
+
+							{/* Group Size */}
+							<div>
+								<label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+									<Users className="w-4 h-4 text-amber-400" />
+									{lang === "es" ? "¿Cuántas personas?" : "How many people?"}
+								</label>
+								<div className="flex gap-2">
+									{[1,2,3,4,5].map(n => (
+										<button
+											key={n}
+											type="button"
+											onClick={() => { setGroupSize(n); setGroupNames(Array(Math.max(0,n-1)).fill("")); }}
+											className={`flex-1 py-3 rounded-xl border-2 font-bold text-base transition-all ${groupSize===n?"border-amber-500 bg-amber-500/15 text-amber-400":"border-gray-700 bg-gray-800/50 text-gray-400"}`}
+										>
+											{n}
+										</button>
+									))}
+								</div>
+							</div>
+
+							{/* Additional names */}
+							{groupSize > 1 && (
+								<div className="space-y-3">
+									<p className="text-sm text-gray-400">{lang === "es" ? "Nombres de los acompañantes:" : "Names of the others:"}</p>
+									{Array.from({ length: groupSize - 1 }).map((_, i) => (
+										<input
+											key={i}
+											type="text"
+											value={groupNames[i] ?? ""}
+											onChange={(e) => { const u=[...groupNames]; u[i]=e.target.value; setGroupNames(u); }}
+											placeholder={lang === "es" ? `Persona ${i+2} — nombre` : `Person ${i+2} — name`}
+											className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-base"
+										/>
+									))}
+								</div>
+							)}
 
 							{/* SMS Consent Checkbox */}
 							<label
@@ -297,7 +368,7 @@ function RegisterPage() {
 						<button
 							type="button"
 							onClick={() => setStep(2)}
-							disabled={!name.trim() || !phone.trim()}
+							disabled={!name.trim() || phone.length !== 10 || groupNames.slice(0,groupSize-1).some((n:string) => !n.trim())}
 							className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg shadow-lg shadow-amber-500/20"
 						>
 							{t.next}
@@ -441,6 +512,7 @@ function QueueConfirmation({
 		shopName: string | null;
 		queuePosition: number;
 		barberName: string;
+		groupResults?: Array<{ name: string; position: number; visitId: number }>;
 	};
 	lang: Lang;
 }) {
@@ -454,13 +526,68 @@ function QueueConfirmation({
 	const currentPosition = posData?.position ?? result.queuePosition;
 	const isDone = posData === null;
 	const alreadyInQueue = (result as any).alreadyInQueue ?? false;
+	const prevPosition = result.queuePosition;
 
 	const [pulse, setPulse] = useState(false);
 	useEffect(() => {
 		setPulse(true);
 		const timer = setTimeout(() => setPulse(false), 600);
 		return () => clearTimeout(timer);
-	}, []);
+	}, [currentPosition]);
+
+	// Vibrate continuously when it's your turn — stop when client taps screen
+	const [turnConfirmed, setTurnConfirmed] = useState(false);
+	useEffect(() => {
+		if (!isDone || turnConfirmed) return;
+		if (!("vibrate" in navigator)) return;
+		// Vibrate pattern: 1 second on, 0.5 second off — repeat
+		const pattern = [1000, 500];
+		let running = true;
+		const vibrate = () => {
+			if (!running) return;
+			navigator.vibrate(pattern);
+			setTimeout(() => { if (running) vibrate(); }, 1500);
+		};
+		vibrate();
+		return () => { running = false; navigator.vibrate(0); };
+	}, [isDone, turnConfirmed]);
+
+	// Wake Lock — keep screen on while waiting
+	useEffect(() => {
+		if (isDone && turnConfirmed) return;
+		let wakeLock: any = null;
+		const requestWakeLock = async () => {
+			try {
+				if ("wakeLock" in navigator) {
+					wakeLock = await (navigator as any).wakeLock.request("screen");
+				}
+			} catch {}
+		};
+		requestWakeLock();
+		const handleVisibility = () => {
+			if (document.visibilityState === "visible") requestWakeLock();
+		};
+		document.addEventListener("visibilitychange", handleVisibility);
+		return () => {
+			document.removeEventListener("visibilitychange", handleVisibility);
+			if (wakeLock) wakeLock.release().catch(() => {});
+		};
+	}, [isDone, turnConfirmed]);
+
+	// Warn before leaving — remind client of their turn number
+	useEffect(() => {
+		if (isDone) return;
+		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+			const msg = lang === "es"
+				? "Si sales no podrás ver tu lugar en la fila ni recibirás aviso cuando sea tu turno."
+				: "If you leave you won't be able to see your place in line or receive an alert when it's your turn.";
+			e.preventDefault();
+			e.returnValue = msg;
+			return msg;
+		};
+		window.addEventListener("beforeunload", handleBeforeUnload);
+		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+	}, [isDone, currentPosition, lang]);
 
 	if (isDone) {
 		return (
@@ -484,6 +611,35 @@ function QueueConfirmation({
 						{t.barberWaiting}
 					</p>
 				</div>
+				{!turnConfirmed && (
+					<button
+						type="button"
+						onClick={() => { setTurnConfirmed(true); if ("vibrate" in navigator) navigator.vibrate(0); }}
+						className="w-full max-w-sm py-4 bg-green-500 text-white font-bold text-lg rounded-2xl shadow-lg shadow-green-500/30 animate-pulse"
+					>
+						{lang === "es" ? "✓ Entendido, voy para allá" : "✓ Got it, I'm on my way"}
+					</button>
+				)}
+				{turnConfirmed && result.shopGoogleReviewLink && (
+					<div className="w-full max-w-sm bg-amber-500/10 border border-amber-500/25 rounded-2xl p-5 text-center space-y-3">
+						<p className="text-white font-semibold text-base">
+							{lang === "es" ? "¡Gracias por tu visita! 🙏" : "Thanks for your visit! 🙏"}
+						</p>
+						<p className="text-gray-400 text-sm">
+							{lang === "es"
+								? "¿Te gustó el servicio? Déjanos una reseña en Google, nos ayuda mucho."
+								: "Did you enjoy the service? Leave us a Google review, it means a lot to us."}
+						</p>
+						<a
+							href={result.shopGoogleReviewLink}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="flex items-center justify-center gap-2 w-full py-3.5 bg-amber-500 text-white font-bold text-base rounded-xl shadow-lg shadow-amber-500/25 hover:bg-amber-600 transition-all"
+						>
+							⭐ {lang === "es" ? "Dejar reseña en Google" : "Leave a Google Review"}
+						</a>
+					</div>
+				)}
 			</div>
 		);
 	}
@@ -542,12 +698,30 @@ function QueueConfirmation({
 				)}
 			</div>
 
+			{/* Group results */}
+			{result.groupResults && result.groupResults.length > 1 && (
+				<div className="bg-gray-900/80 border border-amber-500/20 rounded-2xl p-5 max-w-sm w-full">
+					<p className="text-amber-400 font-semibold text-sm mb-3 flex items-center gap-2">
+						<Users className="w-4 h-4" />
+						{lang === "es" ? `Grupo — ${result.groupResults.length} personas` : `Group — ${result.groupResults.length} people`}
+					</p>
+					<div className="space-y-2">
+						{result.groupResults.map((r: any, i: number) => (
+							<div key={i} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+								<span className="text-white text-sm font-medium">{r.name}</span>
+								<span className="text-amber-400 font-bold">#{r.position}</span>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+
 			{/* Welcome Message */}
 			<div className="bg-gray-900/60 border border-gray-800/50 rounded-2xl p-5 max-w-sm w-full">
 				<p className="text-white leading-relaxed">
 					{alreadyInQueue
 				? (lang === "es" ? "Ya estás registrado en la cola de hoy. Esta es tu posición actual:" : "You're already registered in today's queue. This is your current position:")
-				: (result.welcomeMessage || t.defaultWelcome)}
+				: t.defaultWelcome}
 				</p>
 			</div>
 

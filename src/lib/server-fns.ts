@@ -2,10 +2,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import bcrypt from "bcryptjs";
-import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, isNull, lte, or } from "drizzle-orm";
 import { broadcast, db } from "@/db";
-import { appointments, barbers, clients, sessions, shops, users, visits, passwordResetTokens } from "@/db/schema";
+import { appointments, barbers, clients, clientAccounts, clientSessions, sessions, shops, users, visits, passwordResetTokens } from "@/db/schema";
 import { sendSMS } from "@/lib/messaging";
+
+// Helper: get UTC timestamp boundaries for a date in a specific timezone
+function getDateBoundsInTz(dateStr: string, tz: string): { start: Date; end: Date } {
+	const sampleDate = new Date(dateStr + "T12:00:00Z");
+	const utcStr = sampleDate.toLocaleString("en-US", { timeZone: "UTC", hour12: false, year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" });
+	const localStr = sampleDate.toLocaleString("en-US", { timeZone: tz, hour12: false, year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" });
+	const offsetMs = new Date(localStr).getTime() - new Date(utcStr).getTime();
+	return {
+		start: new Date(new Date(dateStr + "T00:00:00.000Z").getTime() - offsetMs),
+		end: new Date(new Date(dateStr + "T23:59:59.999Z").getTime() - offsetMs),
+	};
+}
 
 async function getTwilioCreds() {
 	const mod = await import("cloudflare:workers");
@@ -353,6 +365,7 @@ export const createShop = createServerFn({ method: "POST" })
 				name: data.name,
 				address: data.address,
 				phone: data.phone,
+				whatsappNumber: data.whatsappNumber,
 				googleReviewLink: data.googleReviewLink,
 			})
 			.returning();
@@ -368,6 +381,7 @@ export const updateShop = createServerFn({ method: "POST" })
 			phone?: string;
 			googleReviewLink?: string;
 			welcomeMessage?: string;
+			welcomeMessageEn?: string;
 			followUpMessage?: string;
 			smsConsentText?: string;
 			reminderMessage?: string;
@@ -380,6 +394,8 @@ export const updateShop = createServerFn({ method: "POST" })
 			followUpDelayMinutes?: number;
 			logoUrl?: string;
 			weeklyHours?: string;
+			timezone?: string;
+			whatsappNumber?: string;
 		}) => input,
 	)
 	.handler(async ({ data }) => {
@@ -394,6 +410,31 @@ export const updateShop = createServerFn({ method: "POST" })
 			.update(shops)
 			.set(cleanUpdates)
 			.where(and(eq(shops.id, id), eq(shops.ownerId, userId)));
+
+		// Auto-translate welcomeMessageEn to Spanish if provided
+		if (data.welcomeMessageEn) {
+			try {
+				const res = await fetch("https://api.anthropic.com/v1/messages", {
+					method: "POST",
+					headers: {
+						"x-api-key": (globalThis as any).ANTHROPIC_API_KEY ?? "",
+						"anthropic-version": "2023-06-01",
+						"content-type": "application/json",
+					},
+					body: JSON.stringify({
+						model: "claude-haiku-4-5-20251001",
+						max_tokens: 200,
+						messages: [{ role: "user", content: "Translate this barbershop welcome message to Spanish. Return ONLY the translation, nothing else: " + data.welcomeMessageEn }]
+					})
+				});
+				const json = await res.json() as any;
+				const translated = json?.content?.[0]?.text?.trim();
+				if (translated) {
+					await (await db()).update(shops).set({ welcomeMessage: translated }).where(and(eq(shops.id, id), eq(shops.ownerId, userId)));
+				}
+			} catch {}
+		}
+
 		return { success: true };
 	});
 
@@ -404,7 +445,6 @@ export const getBarbers = createServerFn({ method: "GET" })
 	.handler(async ({ data }) => {
 		const userId = await getUserId();
 		if (!userId) throw new Error("Not authenticated");
-		// Verify ownership
 		const shop = await (await db())
 			.select({ id: shops.id })
 			.from(shops)
@@ -413,7 +453,22 @@ export const getBarbers = createServerFn({ method: "GET" })
 			.all();
 		if (shop.length === 0) throw new Error("Not authorized");
 		return await (await db())
-			.select()
+			.select({
+				id: barbers.id,
+				name: barbers.name,
+				specialty: barbers.specialty,
+				photoUrl: barbers.photoUrl,
+				isActive: barbers.isActive,
+				phone: barbers.phone,
+				userId: barbers.userId,
+				accessCode: barbers.accessCode,
+				workDays: barbers.workDays,
+				onVacation: barbers.onVacation,
+				manualOverrideDate: barbers.manualOverrideDate,
+				stripePayoutsEnabled: barbers.stripePayoutsEnabled,
+				stripeAccountId: barbers.stripeAccountId,
+				createdAt: barbers.createdAt,
+			})
 			.from(barbers)
 			.where(eq(barbers.shopId, data.shopId))
 			.orderBy(barbers.name)
@@ -636,8 +691,10 @@ export const getShopPublic = createServerFn({ method: "GET" })
 				name: shops.name,
 				address: shops.address,
 				welcomeMessage: shops.welcomeMessage,
+			welcomeMessageEn: shops.welcomeMessageEn,
 				smsConsentText: shops.smsConsentText,
 				smsEnabled: shops.smsEnabled,
+				googleReviewLink: shops.googleReviewLink,
 			})
 			.from(shops)
 			.where(eq(shops.id, data.shopId))
@@ -658,7 +715,9 @@ export const getShopPublicFull = createServerFn({ method: "GET" })
 				phone: shops.phone,
 				googleReviewLink: shops.googleReviewLink,
 				welcomeMessage: shops.welcomeMessage,
+			welcomeMessageEn: shops.welcomeMessageEn,
 				weeklyHours: shops.weeklyHours,
+				whatsappNumber: shops.whatsappNumber,
 			})
 			.from(shops)
 			.where(eq(shops.id, data.shopId))
@@ -722,6 +781,42 @@ export const getActiveBarbers = createServerFn({ method: "GET" })
 			}));
 	});
 
+export const getActiveBarbersForDate = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number; date: string }) => input)
+	.handler(async ({ data }) => {
+		const allBarbers = await (await db())
+			.select({
+				id: barbers.id,
+				name: barbers.name,
+				specialty: barbers.specialty,
+				photoUrl: barbers.photoUrl,
+				workDays: barbers.workDays,
+				onVacation: barbers.onVacation,
+				manualOverrideDate: barbers.manualOverrideDate,
+			})
+			.from(barbers)
+			.where(and(eq(barbers.shopId, data.shopId), eq(barbers.isActive, true)))
+			.orderBy(barbers.name)
+			.all();
+
+		// Get day of week for the requested date
+		const dateDow = new Date(data.date + "T12:00:00").getDay();
+
+		return allBarbers
+			.filter((b) => {
+				if (b.onVacation) return false;
+				if (b.manualOverrideDate === data.date) return true;
+				const days: number[] = JSON.parse(b.workDays || "[0,1,2,3,4,5,6]");
+				return days.includes(dateDow);
+			})
+			.map((b) => ({
+				id: b.id,
+				name: b.name,
+				specialty: b.specialty,
+				photoUrl: b.photoUrl,
+			}));
+	});
+
 export const registerVisit = createServerFn({ method: "POST" })
 	.inputValidator(
 		(input: {
@@ -731,6 +826,7 @@ export const registerVisit = createServerFn({ method: "POST" })
 			email?: string;
 			barberId: number;
 			smsConsented: boolean;
+			groupMember?: boolean;
 		}) => input,
 	)
 	.handler(async ({ data }) => {
@@ -790,9 +886,10 @@ export const registerVisit = createServerFn({ method: "POST" })
 			clientId = newClient[0].id;
 		}
 
-		// Check if client already has an active visit today (from appointment or previous QR scan)
-		const today = now.toISOString().split("T")[0];
-		const existingVisit = await (await db())
+		// Check if client already has an active visit today (skip for group members)
+		// Use local date string to avoid UTC day shift
+		const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+		const existingVisit = data.groupMember ? [] : await (await db())
 			.select()
 			.from(visits)
 			.where(
@@ -1437,7 +1534,7 @@ export const callNextClient = createServerFn({ method: "POST" })
 
 // Complete current client
 export const completeClient = createServerFn({ method: "POST" })
-	.inputValidator((input: { visitId: number; shopId: number }) => input)
+	.inputValidator((input: { visitId: number; shopId: number; amountPaid: number }) => input)
 	.handler(async ({ data }) => {
 		const userId = await getUserId();
 		if (!userId) throw new Error("Not authenticated");
@@ -1456,7 +1553,7 @@ export const completeClient = createServerFn({ method: "POST" })
 
 		await (await db())
 			.update(visits)
-			.set({ status: "completed", followUpScheduledAt: followUpTime })
+			.set({ status: "completed", followUpScheduledAt: followUpTime, amountPaid: data.amountPaid })
 			.where(eq(visits.id, data.visitId));
 
 		await broadcast({ type: "queue_updated", shopId: data.shopId });
@@ -1494,7 +1591,6 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 	.handler(async ({ data }) => {
 		const userId = await getUserId();
 		if (!userId) throw new Error("Not authenticated");
-		// Verify ownership
 		const shop = await (await db())
 			.select({ id: shops.id })
 			.from(shops)
@@ -1508,10 +1604,18 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 			.from(clients)
 			.where(eq(clients.shopId, data.shopId));
 
+		// Today's visits only
+		const today = new Date();
+		const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+		const todayEnd = new Date(todayStart.getTime() + 24*60*60*1000);
 		const totalVisits = await (await db())
 			.select({ count: count() })
 			.from(visits)
-			.where(eq(visits.shopId, data.shopId));
+			.where(and(
+				eq(visits.shopId, data.shopId),
+				gte(visits.createdAt, todayStart),
+				lte(visits.createdAt, todayEnd),
+			));
 
 		const recentVisits = await (await db())
 			.select({
@@ -1522,6 +1626,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 				status: visits.status,
 				welcomeSent: visits.welcomeSent,
 				followUpSent: visits.followUpSent,
+				amountPaid: visits.amountPaid,
 				createdAt: visits.createdAt,
 			})
 			.from(visits)
@@ -1567,6 +1672,8 @@ export const getMyRole = createServerFn({ method: "GET" }).handler(async () => {
 			shopId: barbers.shopId,
 			isActive: barbers.isActive,
 			shopName: shops.name,
+			stripePayoutsEnabled: barbers.stripePayoutsEnabled,
+			stripeAccountId: barbers.stripeAccountId,
 		})
 		.from(barbers)
 		.innerJoin(shops, eq(barbers.shopId, shops.id))
@@ -1776,7 +1883,7 @@ export const barberCallNext = createServerFn({ method: "POST" }).handler(
 
 // Barber completes their current client
 export const barberCompleteClient = createServerFn({ method: "POST" })
-	.inputValidator((input: { visitId: number }) => input)
+	.inputValidator((input: { visitId: number; amountPaid: number }) => input)
 	.handler(async ({ data }) => {
 		const userId = await getUserId();
 		if (!userId) throw new Error("Not authenticated");
@@ -1816,7 +1923,7 @@ export const barberCompleteClient = createServerFn({ method: "POST" })
 
 		await (await db())
 			.update(visits)
-			.set({ status: "completed", followUpScheduledAt: followUpTime })
+			.set({ status: "completed", followUpScheduledAt: followUpTime, amountPaid: data.amountPaid })
 			.where(eq(visits.id, data.visitId));
 
 		await broadcast({ type: "queue_updated", shopId: barber[0].shopId });
@@ -1916,6 +2023,143 @@ export const sendSupportEmail = createServerFn({ method: "POST" })
 		return { success: true };
 	});
 
+// ============ REPORTS ============
+
+export const getDailyReport = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number; date: string }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const shop = await (await db())
+			.select({ id: shops.id })
+			.from(shops)
+			.where(and(eq(shops.id, data.shopId), eq(shops.ownerId, userId)))
+			.limit(1).all();
+		if (shop.length === 0) throw new Error("Not authorized");
+
+		// Get shop timezone to correctly calculate day boundaries
+		const shopFull = await (await db()).select({ timezone: shops.timezone }).from(shops).where(eq(shops.id, data.shopId)).limit(1).all();
+		const tz = shopFull[0]?.timezone || "America/New_York";
+
+		// Convert the requested date to UTC boundaries using the shop's timezone
+		// e.g. "2025-05-03" in "America/New_York" (UTC-4) = 04:00 UTC to next day 03:59 UTC
+		const { start: dayStart, end: dayEnd } = getDateBoundsInTz(data.date, tz);
+
+		const dayVisits = await (await db())
+			.select({
+				visitId: visits.id,
+				clientName: clients.name,
+				clientPhone: clients.phone,
+				barberName: barbers.name,
+				status: visits.status,
+				amountPaid: visits.amountPaid,
+				createdAt: visits.createdAt,
+			})
+			.from(visits)
+			.innerJoin(clients, eq(visits.clientId, clients.id))
+			.innerJoin(barbers, eq(visits.barberId, barbers.id))
+			.where(and(
+				eq(visits.shopId, data.shopId),
+				gte(visits.createdAt, dayStart),
+				lte(visits.createdAt, dayEnd),
+			))
+			.orderBy(asc(visits.createdAt))
+			.all();
+
+		const completed = dayVisits.filter(v => v.status === "completed");
+		const cancelled = dayVisits.filter(v => v.status === "cancelled");
+		const noShows = dayVisits.filter(v => v.status === "no_show");
+		const totalRevenue = completed.reduce((sum, v) => sum + (v.amountPaid ?? 0), 0);
+
+		// By barber breakdown
+		const byBarber: Record<string, { count: number; revenue: number }> = {};
+		for (const v of completed) {
+			if (!byBarber[v.barberName]) byBarber[v.barberName] = { count: 0, revenue: 0 };
+			byBarber[v.barberName].count++;
+			byBarber[v.barberName].revenue += v.amountPaid ?? 0;
+		}
+
+		return {
+			date: data.date,
+			visits: dayVisits,
+			totalClients: dayVisits.length,
+			totalCompleted: completed.length,
+			totalCancelled: cancelled.length,
+			totalNoShows: noShows.length,
+			totalRevenue,
+			byBarber,
+		};
+	});
+
+export const getMonthlyReport = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number; year: number; month: number }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const shop = await (await db())
+			.select({ id: shops.id })
+			.from(shops)
+			.where(and(eq(shops.id, data.shopId), eq(shops.ownerId, userId)))
+			.limit(1).all();
+		if (shop.length === 0) throw new Error("Not authorized");
+
+		const shopTz = await (await db()).select({ timezone: shops.timezone }).from(shops).where(eq(shops.id, data.shopId)).limit(1).all();
+		const mTz = shopTz[0]?.timezone || "America/New_York";
+		const mPad = String(data.month).padStart(2, "0");
+		const daysInMonth = new Date(data.year, data.month, 0).getDate();
+		const { start: monthStart } = getDateBoundsInTz(`${data.year}-${mPad}-01`, mTz);
+		const { end: monthEnd } = getDateBoundsInTz(`${data.year}-${mPad}-${String(daysInMonth).padStart(2,"0")}`, mTz);
+
+		const monthVisits = await (await db())
+			.select({
+				visitId: visits.id,
+				clientName: clients.name,
+				barberName: barbers.name,
+				status: visits.status,
+				amountPaid: visits.amountPaid,
+				createdAt: visits.createdAt,
+			})
+			.from(visits)
+			.innerJoin(clients, eq(visits.clientId, clients.id))
+			.innerJoin(barbers, eq(visits.barberId, barbers.id))
+			.where(and(
+				eq(visits.shopId, data.shopId),
+				gte(visits.createdAt, monthStart),
+				lte(visits.createdAt, monthEnd),
+			))
+			.orderBy(asc(visits.createdAt))
+			.all();
+
+		// Group by day
+		const byDay: Record<string, { clients: number; revenue: number; cancelled: number }> = {};
+		for (const v of monthVisits) {
+			const day = new Date(v.createdAt!).toISOString().split("T")[0];
+			if (!byDay[day]) byDay[day] = { clients: 0, revenue: 0, cancelled: 0 };
+			if (v.status === "cancelled") byDay[day].cancelled++;
+			else { byDay[day].clients++; byDay[day].revenue += v.amountPaid ?? 0; }
+		}
+
+		const completed = monthVisits.filter(v => v.status === "completed");
+
+		// By barber
+		const byBarber: Record<string, { count: number; revenue: number }> = {};
+		for (const v of completed) {
+			if (!byBarber[v.barberName]) byBarber[v.barberName] = { count: 0, revenue: 0 };
+			byBarber[v.barberName].count++;
+			byBarber[v.barberName].revenue += v.amountPaid ?? 0;
+		}
+
+		return {
+			year: data.year,
+			month: data.month,
+			totalClients: completed.length,
+			totalRevenue: completed.reduce((s,v) => s + (v.amountPaid ?? 0), 0),
+			byDay,
+			byBarber,
+			visits: monthVisits,
+		};
+	});
+
 // ============ STRIPE PAYMENTS ============
 
 async function getStripeKey() {
@@ -1950,7 +2194,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 			},
 			body: new URLSearchParams({
 				"mode": "subscription",
-				"line_items[0][price]": "price_1TEpUE1NfybwCy3hLK4LwK6U",
+				"line_items[0][price]": "price_1TTd8iP4c97NjwNqp6XoR1xU",
 				"line_items[0][quantity]": "1",
 				"success_url": `${origin}/?payment=success&shopId=${shop[0].id}&session_id={CHECKOUT_SESSION_ID}`,
 				"cancel_url": `${origin}/?payment=cancelled`,
@@ -1991,6 +2235,110 @@ export const getSubscriptionStatus = createServerFn({ method: "GET" })
 	});
 
 // Cancel subscription
+// ============ CLIENT RETENTION ============
+
+export const getInactiveClients = createServerFn({ method: "GET" })
+	.handler(async () => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const shop = await (await db()).select({ id: shops.id }).from(shops).where(eq(shops.ownerId, userId)).limit(1).all();
+		if (!shop[0]) throw new Error("No shop found");
+		const shopId = shop[0].id;
+
+		// 30 days ago in seconds (Unix timestamp)
+		const thirtyDaysAgoSec = Math.floor(Date.now() / 1000) - (30 * 86400);
+		const nowSec = Math.floor(Date.now() / 1000);
+
+		const allVisits = await (await db())
+			.select({
+				clientId: clients.id,
+				clientName: clients.name,
+				clientPhone: clients.phone,
+				// Use CAST to ensure we get a number in seconds
+				lastVisit: sql<number>`CAST(MAX(${visits.createdAt}) AS INTEGER)`,
+				totalVisits: sql<number>`COUNT(${visits.id})`,
+			})
+			.from(visits)
+			.innerJoin(clients, eq(visits.clientId, clients.id))
+			.where(and(eq(visits.shopId, shopId), eq(visits.status, "completed")))
+			.groupBy(clients.id)
+			.all() as any[];
+
+		const inactive = allVisits
+			.filter(c => {
+				const lastVisitSec = Number(c.lastVisit);
+				// Handle both seconds and milliseconds
+				const normalized = lastVisitSec > 1e10 ? Math.floor(lastVisitSec / 1000) : lastVisitSec;
+				return normalized < thirtyDaysAgoSec;
+			})
+			.map(c => {
+				const lastVisitSec = Number(c.lastVisit);
+				const normalized = lastVisitSec > 1e10 ? Math.floor(lastVisitSec / 1000) : lastVisitSec;
+				return {
+					clientId: c.clientId,
+					name: c.clientName,
+					phone: c.clientPhone,
+					lastVisit: new Date(normalized * 1000).toISOString().split("T")[0],
+					daysSince: Math.floor((nowSec - normalized) / 86400),
+					totalVisits: Number(c.totalVisits),
+				};
+			})
+			.sort((a, b) => b.daysSince - a.daysSince);
+
+		const statuses = await (await db()).select().from(clientRetention).where(eq(clientRetention.shopId, shopId)).all();
+		const statusMap = new Map(statuses.map((s: any) => [s.clientId, s]));
+
+		return inactive.map(c => ({
+			...c,
+			callStatus: (statusMap.get(c.clientId) as any)?.callStatus ?? "pending",
+			note: (statusMap.get(c.clientId) as any)?.note ?? null,
+			calledAt: (statusMap.get(c.clientId) as any)?.updatedAt ?? null,
+		}));
+	});
+
+export const updateClientCallStatus = createServerFn({ method: "POST" })
+	.inputValidator((input: { clientId: number; status: string; note?: string }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const shop = await (await db()).select({ id: shops.id }).from(shops).where(eq(shops.ownerId, userId)).limit(1).all();
+		if (!shop[0]) throw new Error("No shop found");
+
+		const existing = await (await db()).select({ id: clientRetention.id }).from(clientRetention)
+			.where(and(eq(clientRetention.shopId, shop[0].id), eq(clientRetention.clientId, data.clientId)))
+			.limit(1).all();
+
+		const now = Math.floor(Date.now() / 1000);
+		if (existing[0]) {
+			await (await db()).update(clientRetention)
+				.set({ callStatus: data.status, note: data.note ?? null, updatedAt: now })
+				.where(eq(clientRetention.id, existing[0].id));
+		} else {
+			await (await db()).insert(clientRetention)
+				.values({ shopId: shop[0].id, clientId: data.clientId, callStatus: data.status, note: data.note ?? null, updatedAt: now });
+		}
+		return { success: true };
+	});
+
+
+// ============ REVIEW PAGE ============
+export const getShopReviewPage = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number }) => input)
+	.handler(async ({ data }) => {
+		const shop = await (await db())
+			.select({
+				id: shops.id,
+				name: shops.name,
+				googleReviewLink: shops.googleReviewLink,
+				whatsappNumber: shops.whatsappNumber,
+				logoUrl: shops.logoUrl,
+			})
+			.from(shops)
+			.where(eq(shops.id, data.shopId))
+			.limit(1).all();
+		return shop[0] ?? null;
+	});
+
 export const cancelSubscription = createServerFn({ method: "POST" })
 	.inputValidator((input: { reason?: string }) => input)
 	.handler(async ({ data }) => {
@@ -2166,23 +2514,30 @@ export const getAvailableSlots = createServerFn({ method: "GET" })
 			.where(eq(shops.id, data.shopId))
 			.limit(1)
 			.all();
-
-		const weeklyHours = shop[0]?.weeklyHours ? JSON.parse(shop[0].weeklyHours) : {};
+		let weeklyHours: Record<number, { open: string; close: string; closed: boolean }> = {};
+		try {
+			if (shop[0]?.weeklyHours) weeklyHours = JSON.parse(shop[0].weeklyHours);
+		} catch {}
 		const dayOfWeek = new Date(data.date + "T12:00:00").getDay();
 		const dayHours = weeklyHours[dayOfWeek] ?? { open: "09:00", close: "18:00", closed: false };
 
-		if (dayHours.closed) return { slots: [] };
+		// Only return empty if explicitly marked closed
+		if (dayHours.closed === true) return { slots: [] };
 
 		// Generate 30-min slots
 		const slots: string[] = [];
 		const [openH, openM] = dayHours.open.split(":").map(Number);
 		const [closeH, closeM] = dayHours.close.split(":").map(Number);
 		let current = openH * 60 + openM;
-		const end = closeH * 60 + closeM - 30; // Stop 30 min before close
+		// Handle close times past midnight (e.g. 01:00 = next day = 25:00)
+		let closeMinutes = closeH * 60 + closeM;
+		if (closeMinutes < current) closeMinutes += 24 * 60; // next day
+		const end = closeMinutes - 30; // Stop 30 min before close
 
 		while (current <= end) {
-			const h = Math.floor(current / 60).toString().padStart(2, "0");
-			const m = (current % 60).toString().padStart(2, "0");
+			const actualH = current % (24 * 60);
+			const h = Math.floor(actualH / 60).toString().padStart(2, "0");
+			const m = (actualH % 60).toString().padStart(2, "0");
 			slots.push(`${h}:${m}`);
 			current += 30;
 		}
@@ -2211,9 +2566,12 @@ export const createAppointment = createServerFn({ method: "POST" })
 		barberId: number;
 		clientName: string;
 		clientPhone: string;
+		clientEmail?: string;
+		clientAccountId?: number;
 		date: string;
 		time: string;
 		notes?: string;
+		groupSize?: number;
 	}) => input)
 	.handler(async ({ data }) => {
 		// Get or create client
@@ -2248,6 +2606,8 @@ export const createAppointment = createServerFn({ method: "POST" })
 				appointmentDate: data.date,
 				appointmentTime: data.time,
 				notes: data.notes,
+				groupSize: data.groupSize ?? 1,
+				clientUserId: data.clientAccountId ?? null,
 			})
 			.returning()
 			.all();
@@ -2282,7 +2642,53 @@ export const createAppointment = createServerFn({ method: "POST" })
 			}).catch(() => {});
 		}
 
-		return { success: true, appointmentId: appt[0]?.id };
+		const barberData = await (await db()).select({ name: barbers.name }).from(barbers).where(eq(barbers.id, data.barberId)).limit(1).all();
+		const shopData = await (await db()).select({ name: shops.name }).from(shops).where(eq(shops.id, data.shopId)).limit(1).all();
+
+		// Send confirmation email if client has email
+		if (data.clientEmail) {
+			const resendKey = (globalThis as any).RESEND_API_KEY;
+			if (resendKey) {
+				const dateFormatted = new Date(data.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+				const timeFormatted = formatTime12(data.time);
+				const shopName = shopData[0]?.name ?? "";
+				const barberName = barberData[0]?.name ?? "";
+				const peopleRow = (data.groupSize ?? 1) > 1 ? "<tr><td style=\"color:#6b7280;padding:6px 0\">People</td><td style=\"text-align:right;padding:6px 0;font-weight:600\">" + (data.groupSize ?? 1) + "</td></tr>" : "";
+				const htmlBody = "<div style=\"font-family:sans-serif;max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden\">"
+					+ "<div style=\"background:#f97316;padding:28px 32px;text-align:center\"><h1 style=\"color:white;margin:0;font-size:22px;font-weight:700\">Appointment Confirmed</h1></div>"
+					+ "<div style=\"padding:32px\">"
+					+ "<p style=\"margin:0 0 20px;color:#111827\">Hi <strong>" + data.clientName + "</strong>, your appointment is confirmed!</p>"
+					+ "<table style=\"width:100%;border-collapse:collapse;margin-bottom:24px;background:#f9fafb;border-radius:8px;padding:16px\">"
+					+ "<tr><td style=\"color:#6b7280;padding:6px 0\">Shop</td><td style=\"text-align:right;padding:6px 0;font-weight:600\">" + shopName + "</td></tr>"
+					+ "<tr><td style=\"color:#6b7280;padding:6px 0\">Barber</td><td style=\"text-align:right;padding:6px 0;font-weight:600\">" + barberName + "</td></tr>"
+					+ "<tr><td style=\"color:#6b7280;padding:6px 0\">Date</td><td style=\"text-align:right;padding:6px 0;font-weight:600\">" + dateFormatted + "</td></tr>"
+					+ "<tr><td style=\"color:#6b7280;padding:6px 0\">Time</td><td style=\"text-align:right;padding:6px 0;font-weight:600\">" + timeFormatted + "</td></tr>"
+					+ peopleRow
+					+ "</table>"
+					+ "<p style=\"color:#6b7280;font-size:13px;margin:0\">If you need to cancel, please contact the shop directly.</p>"
+					+ "</div></div>";
+				fetch("https://api.resend.com/emails", {
+					method: "POST",
+					headers: { "Authorization": "Bearer " + resendKey, "Content-Type": "application/json" },
+					body: JSON.stringify({
+						from: "Goolinext <appointments@goolinext.com>",
+						to: [data.clientEmail],
+						subject: "Appointment confirmed at " + shopName,
+						html: htmlBody,
+					}),
+				}).catch(() => {});
+			}
+		}
+
+		return {
+			success: true,
+			appointmentId: appt[0]?.id,
+			appointmentDate: data.date,
+			appointmentTime: data.time,
+			barberName: barberData[0]?.name ?? "",
+			shopName: shopData[0]?.name ?? "",
+			groupSize: data.groupSize ?? 1,
+		};
 	});
 
 // Helper to format time
@@ -2415,7 +2821,8 @@ export const processAppointmentReminders = createServerFn({ method: "POST" })
 		if (!creds.sid) return { sent: 0 };
 
 		const now = new Date();
-		const today = now.toISOString().split("T")[0];
+		// Use local date string to avoid UTC day shift
+		const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 		const in2hours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 		const reminderTime = `${in2hours.getHours().toString().padStart(2, "0")}:${in2hours.getMinutes().toString().padStart(2, "0")}`;
 
@@ -2657,7 +3064,8 @@ export const sendRecoveryEmail = createServerFn({ method: "POST" })
 export const processAppointmentsToQueue = createServerFn({ method: "POST" })
 	.handler(async () => {
 		const now = new Date();
-		const today = now.toISOString().split("T")[0];
+		// Use local date string to avoid UTC day shift
+		const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 		const currentHour = now.getHours().toString().padStart(2, "0");
 		const currentMin = now.getMinutes().toString().padStart(2, "0");
 		const currentTime = `${currentHour}:${currentMin}`;
@@ -2729,4 +3137,753 @@ export const processAppointmentsToQueue = createServerFn({ method: "POST" })
 		}
 
 		return { added };
+	});
+
+// ============ SUPERADMIN ============
+
+export const getSuperAdminData = createServerFn({ method: "GET" })
+	.handler(async () => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+
+		const allShops = await (await db())
+			.select({
+				shopId: shops.id,
+				shopName: shops.name,
+				ownerEmail: users.email,
+				ownerPhone: users.phone,
+				status: shops.subscriptionStatus,
+				stripeSubId: shops.stripeSubscriptionId,
+				createdAt: shops.createdAt,
+				address: shops.address,
+			})
+			.from(shops)
+			.leftJoin(users, eq(shops.ownerId, users.id))
+			.orderBy(desc(shops.createdAt))
+			.all();
+
+		const clientCounts = await (await db())
+			.select({ shopId: clients.shopId, count: count() })
+			.from(clients).groupBy(clients.shopId).all();
+
+		const visitCounts = await (await db())
+			.select({ shopId: visits.shopId, count: count() })
+			.from(visits).groupBy(visits.shopId).all();
+
+		const totalUsers = await (await db()).select({ count: count() }).from(users).all();
+		const totalShops = await (await db()).select({ count: count() }).from(shops).all();
+		const activeShops = await (await db()).select({ count: count() }).from(shops).where(eq(shops.subscriptionStatus, "active")).all();
+		const trialShops = await (await db()).select({ count: count() }).from(shops).where(eq(shops.subscriptionStatus, "trial")).all();
+
+		return {
+			shops: allShops.map(s => ({
+				...s,
+				clientCount: clientCounts.find(c => c.shopId === s.shopId)?.count ?? 0,
+				visitCount: visitCounts.find(v => v.shopId === s.shopId)?.count ?? 0,
+			})),
+			stats: {
+				totalUsers: totalUsers[0]?.count ?? 0,
+				totalShops: totalShops[0]?.count ?? 0,
+				activeShops: activeShops[0]?.count ?? 0,
+				trialShops: trialShops[0]?.count ?? 0,
+				mrr: (activeShops[0]?.count ?? 0) * 150,
+			},
+		};
+	});
+
+export const adminGetShopDetail = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+
+		const shop = await (await db()).select().from(shops).leftJoin(users, eq(shops.ownerId, users.id)).where(eq(shops.id, data.shopId)).limit(1).all();
+		const barberList = await (await db()).select().from(barbers).where(eq(barbers.shopId, data.shopId)).all();
+		const clientList = await (await db()).select().from(clients).where(eq(clients.shopId, data.shopId)).orderBy(desc(clients.createdAt)).all();
+		const visitList = await (await db()).select().from(visits).where(eq(visits.shopId, data.shopId)).orderBy(desc(visits.id)).limit(50).all();
+
+		return { shop: shop[0], barbers: barberList, clients: clientList, visits: visitList };
+	});
+
+export const adminUpdateClientEmail = createServerFn({ method: "POST" })
+	.inputValidator((input: { clientId: number; email: string }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+		await (await db()).update(clients).set({ email: data.email }).where(eq(clients.id, data.clientId));
+		return { success: true };
+	});
+
+export const adminDeleteClient = createServerFn({ method: "POST" })
+	.inputValidator((input: { clientId: number }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+		await (await db()).delete(visits).where(eq(visits.clientId, data.clientId));
+		await (await db()).delete(clients).where(eq(clients.id, data.clientId));
+		return { success: true };
+	});
+
+export const adminDeleteShop = createServerFn({ method: "POST" })
+	.inputValidator((input: { shopId: number }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+		const shop = await (await db()).select({ ownerId: shops.ownerId }).from(shops).where(eq(shops.id, data.shopId)).limit(1).all();
+		const ownerId = shop[0]?.ownerId;
+		await (await db()).delete(appointments).where(eq(appointments.shopId, data.shopId));
+		await (await db()).delete(visits).where(eq(visits.shopId, data.shopId));
+		await (await db()).delete(clients).where(eq(clients.shopId, data.shopId));
+		await (await db()).delete(barbers).where(eq(barbers.shopId, data.shopId));
+		await (await db()).delete(shops).where(eq(shops.id, data.shopId));
+		if (ownerId) {
+			await (await db()).delete(sessions).where(eq(sessions.userId, ownerId));
+			await (await db()).delete(users).where(and(eq(users.id, ownerId), eq(users.isAdmin, false)));
+		}
+		return { success: true };
+	});
+
+export const adminUpdateShopStatus = createServerFn({ method: "POST" })
+	.inputValidator((input: { shopId: number; status: string }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+		await (await db()).update(shops).set({ subscriptionStatus: data.status }).where(eq(shops.id, data.shopId));
+		return { success: true };
+	});
+
+export const adminUpdateUserEmail = createServerFn({ method: "POST" })
+	.inputValidator((input: { targetUserId: number; email: string }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+		await (await db()).update(users).set({ email: data.email }).where(eq(users.id, data.targetUserId));
+		return { success: true };
+	});
+
+export const adminResetUserPassword = createServerFn({ method: "POST" })
+	.inputValidator((input: { targetUserId: number; newPassword: string }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+		if (data.newPassword.length < 6) throw new Error("Password must be at least 6 characters");
+		const hash = await bcrypt.hash(data.newPassword, 10);
+		await (await db()).update(users).set({ passwordHash: hash }).where(eq(users.id, data.targetUserId));
+		await (await db()).delete(sessions).where(eq(sessions.userId, data.targetUserId));
+		return { success: true };
+	});
+
+export const adminIssueRefund = createServerFn({ method: "POST" })
+	.inputValidator((input: { stripeSubscriptionId: string; reason: string }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+
+		const mod = await import("cloudflare:workers");
+		const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+
+		const subRes = await fetch(`https://api.stripe.com/v1/subscriptions/${data.stripeSubscriptionId}`, { headers: { Authorization: `Bearer ${stripeKey}` } });
+		const sub = await subRes.json() as { latest_invoice?: string; customer?: string };
+		if (!sub.latest_invoice) throw new Error("No invoice found for subscription");
+
+		const invRes = await fetch(`https://api.stripe.com/v1/invoices/${sub.latest_invoice}`, { headers: { Authorization: `Bearer ${stripeKey}` } });
+		const inv = await invRes.json() as { payment_intent?: any; charge?: any };
+
+		let refundTarget: string | null = null;
+		if (inv.payment_intent) refundTarget = typeof inv.payment_intent === "string" ? inv.payment_intent : inv.payment_intent?.id;
+		else if (inv.charge) refundTarget = typeof inv.charge === "string" ? inv.charge : inv.charge?.id;
+		else if (sub.customer) {
+			const piRes = await fetch(`https://api.stripe.com/v1/payment_intents?customer=${sub.customer}&limit=1`, { headers: { Authorization: `Bearer ${stripeKey}` } });
+			const piData = await piRes.json() as { data?: Array<{ id: string }> };
+			refundTarget = piData.data?.[0]?.id ?? null;
+		}
+
+		if (!refundTarget) throw new Error("Could not find a payment to refund");
+		const refundTarget2 = String(refundTarget);
+		const body: Record<string, string> = { reason: "requested_by_customer" };
+		if (refundTarget2.startsWith("pi_")) body.payment_intent = refundTarget2;
+		else body.charge = refundTarget2;
+
+		const refundRes = await fetch("https://api.stripe.com/v1/refunds", {
+			method: "POST",
+			headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams(body),
+		});
+		const refund = await refundRes.json() as { id?: string; status?: string; error?: { message: string } };
+		if (!refundRes.ok) throw new Error(refund.error?.message ?? "Refund failed");
+		return { success: true, refundId: refund.id, status: refund.status };
+	});
+
+export const adminCancelSubscription = createServerFn({ method: "POST" })
+	.inputValidator((input: { stripeSubscriptionId: string; shopId: number }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const user = await (await db()).select().from(users).where(eq(users.id, userId)).limit(1).all();
+		if (!user[0]?.isAdmin) throw new Error("Not authorized");
+
+		const mod = await import("cloudflare:workers");
+		const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+
+		await fetch(`https://api.stripe.com/v1/subscriptions/${data.stripeSubscriptionId}`, { method: "DELETE", headers: { Authorization: `Bearer ${stripeKey}` } });
+		await (await db()).update(shops).set({ subscriptionStatus: "canceled" }).where(eq(shops.id, data.shopId));
+		return { success: true };
+	});
+
+export const getYearlyReport = createServerFn({ method: "GET" })
+	.inputValidator((input: { shopId: number; year: number }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const shop = await (await db())
+			.select({ id: shops.id })
+			.from(shops)
+			.where(and(eq(shops.id, data.shopId), eq(shops.ownerId, userId)))
+			.limit(1).all();
+		if (shop.length === 0) throw new Error("Not authorized");
+
+		const shopTzY = await (await db()).select({ timezone: shops.timezone }).from(shops).where(eq(shops.id, data.shopId)).limit(1).all();
+		const yTz = shopTzY[0]?.timezone || "America/New_York";
+		const { start: yearStart } = getDateBoundsInTz(`${data.year}-01-01`, yTz);
+		const { end: yearEnd } = getDateBoundsInTz(`${data.year}-12-31`, yTz);
+
+		const yearVisits = await (await db())
+			.select({
+				visitId: visits.id,
+				clientName: clients.name,
+				barberName: barbers.name,
+				status: visits.status,
+				amountPaid: visits.amountPaid,
+				createdAt: visits.createdAt,
+			})
+			.from(visits)
+			.innerJoin(clients, eq(visits.clientId, clients.id))
+			.innerJoin(barbers, eq(visits.barberId, barbers.id))
+			.where(and(
+				eq(visits.shopId, data.shopId),
+				gte(visits.createdAt, yearStart),
+				lte(visits.createdAt, yearEnd),
+			))
+			.orderBy(asc(visits.createdAt))
+			.all();
+
+		// Group by month
+		const byMonth: Record<number, { clients: number; revenue: number; cancelled: number }> = {};
+		for (let m = 1; m <= 12; m++) byMonth[m] = { clients: 0, revenue: 0, cancelled: 0 };
+
+		for (const v of yearVisits) {
+			const month = new Date(v.createdAt!).getMonth() + 1;
+			if (v.status === "cancelled") byMonth[month].cancelled++;
+			else { byMonth[month].clients++; byMonth[month].revenue += v.amountPaid ?? 0; }
+		}
+
+		// By barber
+		const byBarber: Record<string, { count: number; revenue: number }> = {};
+		for (const v of yearVisits.filter(v => v.status === "completed")) {
+			if (!byBarber[v.barberName]) byBarber[v.barberName] = { count: 0, revenue: 0 };
+			byBarber[v.barberName].count++;
+			byBarber[v.barberName].revenue += v.amountPaid ?? 0;
+		}
+
+		const completed = yearVisits.filter(v => v.status === "completed");
+		return {
+			year: data.year,
+			totalClients: completed.length,
+			totalRevenue: completed.reduce((s, v) => s + (v.amountPaid ?? 0), 0),
+			byMonth,
+			byBarber,
+			visits: yearVisits,
+		};
+	});
+
+export const barberCancelVisit = createServerFn({ method: "POST" })
+	.inputValidator((input: { visitId: number; status: "cancelled" | "no_show" }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+
+		const barber = await (await db())
+			.select({ id: barbers.id, shopId: barbers.shopId })
+			.from(barbers)
+			.where(eq(barbers.userId, userId))
+			.limit(1).all();
+		if (!barber[0]) throw new Error("Not a barber");
+
+		// Verify visit belongs to this barber
+		const visit = await (await db())
+			.select()
+			.from(visits)
+			.where(and(
+				eq(visits.id, data.visitId),
+				eq(visits.barberId, barber[0].id),
+			))
+			.limit(1).all();
+		if (!visit[0]) throw new Error("Visit not found");
+
+		await (await db())
+			.update(visits)
+			.set({ status: data.status })
+			.where(eq(visits.id, data.visitId));
+
+		await broadcast({ type: "queue_updated", shopId: barber[0].shopId });
+		return { success: true };
+	});
+
+// ============ CLIENT ACCOUNT AUTH ============
+
+const CLIENT_SESSION_COOKIE = "goolinext_client";
+const CLIENT_SESSION_DAYS = 30;
+
+async function getClientSessionUser(): Promise<{ id: number; name: string; phone: string; email: string | null } | null> {
+	const request = getRequest();
+	const cookieHeader = request.headers.get("cookie") ?? "";
+	const cookies: Record<string, string> = {};
+	for (const part of cookieHeader.split(";")) {
+		const [key, ...vals] = part.trim().split("=");
+		if (key) cookies[key.trim()] = vals.join("=");
+	}
+	const sessionId = cookies[CLIENT_SESSION_COOKIE];
+	if (!sessionId) return null;
+
+	const now = new Date();
+	const result = await (await db())
+		.select({ clientAccountId: clientSessions.clientAccountId, expiresAt: clientSessions.expiresAt })
+		.from(clientSessions)
+		.where(eq(clientSessions.id, sessionId))
+		.limit(1).all();
+
+	const session = result[0];
+	if (!session || session.expiresAt < now) return null;
+
+	const client = await (await db())
+		.select({ id: clientAccounts.id, name: clientAccounts.name, phone: clientAccounts.phone, email: clientAccounts.email })
+		.from(clientAccounts)
+		.where(eq(clientAccounts.id, session.clientAccountId))
+		.limit(1).all();
+
+	return client[0] ?? null;
+}
+
+export const clientSignup = createServerFn({ method: "POST" })
+	.inputValidator((input: { name: string; phone: string; password: string; email?: string }) => input)
+	.handler(async ({ data }) => {
+		const existing = await (await db())
+			.select({ id: clientAccounts.id })
+			.from(clientAccounts)
+			.where(eq(clientAccounts.phone, data.phone))
+			.limit(1).all();
+		if (existing[0]) return { success: false as const, error: "PHONE_EXISTS" };
+		if (data.password.length < 6) return { success: false as const, error: "PASSWORD_TOO_SHORT" };
+
+		const passwordHash = await bcrypt.hash(data.password, 10);
+		const result = await (await db())
+			.insert(clientAccounts)
+			.values({ name: data.name, phone: data.phone, email: data.email || null, passwordHash })
+			.returning().all();
+
+		const newClient = result[0];
+		const sessionId = generateSessionId();
+		const expiresAt = new Date(Date.now() + CLIENT_SESSION_DAYS * 24 * 60 * 60 * 1000);
+		await (await db()).insert(clientSessions).values({ id: sessionId, clientAccountId: newClient.id, expiresAt });
+
+		setCookie(CLIENT_SESSION_COOKIE, sessionId, { httpOnly: true, secure: true, sameSite: "lax", path: "/", expires: expiresAt });
+		return { success: true as const };
+	});
+
+export const clientLogin = createServerFn({ method: "POST" })
+	.inputValidator((input: { phone: string; password: string }) => input)
+	.handler(async ({ data }) => {
+		const result = await (await db())
+			.select()
+			.from(clientAccounts)
+			.where(eq(clientAccounts.phone, data.phone))
+			.limit(1).all();
+		if (!result[0]) return { success: false as const, error: "INVALID_CREDENTIALS" };
+
+		const valid = await bcrypt.compare(data.password, result[0].passwordHash);
+		if (!valid) return { success: false as const, error: "INVALID_CREDENTIALS" };
+
+		const sessionId = generateSessionId();
+		const expiresAt = new Date(Date.now() + CLIENT_SESSION_DAYS * 24 * 60 * 60 * 1000);
+		await (await db()).insert(clientSessions).values({ id: sessionId, clientAccountId: result[0].id, expiresAt });
+		setCookie(CLIENT_SESSION_COOKIE, sessionId, { httpOnly: true, secure: true, sameSite: "lax", path: "/", expires: expiresAt });
+		return { success: true as const };
+	});
+
+export const clientGetMe = createServerFn({ method: "GET" })
+	.handler(async () => {
+		return await getClientSessionUser();
+	});
+
+export const clientLogout = createServerFn({ method: "POST" })
+	.handler(async () => {
+		deleteCookie(CLIENT_SESSION_COOKIE);
+		return { success: true };
+	});
+
+export const clientGetAppointments = createServerFn({ method: "GET" })
+	.handler(async () => {
+		const client = await getClientSessionUser();
+		if (!client) throw new Error("Not authenticated");
+
+		return await (await db())
+			.select({
+				id: appointments.id,
+				appointmentDate: appointments.appointmentDate,
+				appointmentTime: appointments.appointmentTime,
+				status: appointments.status,
+				depositPaid: appointments.depositPaid,
+				depositAmount: appointments.depositAmount,
+				cancelToken: appointments.cancelToken,
+				barberName: barbers.name,
+				shopName: shops.name,
+				shopAddress: shops.address,
+			})
+			.from(appointments)
+			.leftJoin(barbers, eq(appointments.barberId, barbers.id))
+			.leftJoin(shops, eq(appointments.shopId, shops.id))
+			.where(eq(appointments.clientUserId, client.id))
+			.orderBy(desc(appointments.appointmentDate))
+			.all();
+	});
+
+export const cancelClientAppointment = createServerFn({ method: "POST" })
+	.inputValidator((input: { appointmentId: number }) => input)
+	.handler(async ({ data }) => {
+		const client = await getClientSessionUser();
+		if (!client) throw new Error("Not authenticated");
+
+		const appt = await (await db())
+			.select()
+			.from(appointments)
+			.where(and(eq(appointments.id, data.appointmentId), eq(appointments.clientUserId, client.id)))
+			.limit(1).all();
+		if (!appt[0]) throw new Error("Not found");
+
+		// Check 1-hour policy
+		const apptTime = new Date(`${appt[0].appointmentDate}T${appt[0].appointmentTime}:00`);
+		const diffHours = (apptTime.getTime() - Date.now()) / (1000 * 60 * 60);
+		if (diffHours <= 2) throw new Error("TOO_LATE");
+
+		await (await db()).update(appointments).set({ status: "cancelled" }).where(eq(appointments.id, data.appointmentId));
+
+		// Refund if > 2 hours away
+		if (diffHours > 1 && appt[0].stripePaymentIntentId) {
+			const mod = await import("cloudflare:workers");
+			const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+			await fetch("https://api.stripe.com/v1/refunds", {
+				method: "POST",
+				headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+				body: new URLSearchParams({ payment_intent: appt[0].stripePaymentIntentId }),
+			}).catch(() => {});
+		}
+
+		return { success: true, refunded: diffHours > 1 };
+	});
+
+// ============ STRIPE CONNECT ============
+
+export const createStripeConnectLink = createServerFn({ method: "POST" })
+	.inputValidator((input: { type: "owner" | "barber"; barberId?: number }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+
+		const mod = await import("cloudflare:workers");
+		const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+		const origin = "https://goolinext.com";
+
+		// Create Express account
+		const accountRes = await fetch("https://api.stripe.com/v1/accounts", {
+			method: "POST",
+			headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({ type: "express", country: "US", "capabilities[card_payments][requested]": "true", "capabilities[transfers][requested]": "true" }),
+		});
+		const accountData = await accountRes.json() as { id?: string; error?: { message: string } };
+		if (!accountRes.ok || !accountData.id) {
+			throw new Error(accountData.error?.message ?? "Failed to create Stripe account");
+		}
+		const accountId = accountData.id;
+
+		// Save account ID
+		if (data.type === "owner") {
+			const shop = await (await db()).select({ id: shops.id }).from(shops).where(eq(shops.ownerId, userId)).limit(1).all();
+			if (shop[0]) await (await db()).update(shops).set({ stripeAccountId: accountId }).where(eq(shops.id, shop[0].id));
+		} else if (data.barberId) {
+			await (await db()).update(barbers).set({ stripeAccountId: accountId }).where(eq(barbers.id, data.barberId));
+		}
+
+		// Create onboarding link
+		const linkRes = await fetch("https://api.stripe.com/v1/account_links", {
+			method: "POST",
+			headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				account: accountId,
+				refresh_url: `${origin}/dashboard?stripe=refresh`,
+				return_url: `${origin}/dashboard?stripe=success`,
+				type: "account_onboarding",
+			}),
+		});
+		const linkData = await linkRes.json() as { url?: string; error?: { message: string } };
+		if (!linkRes.ok || !linkData.url) {
+			throw new Error(linkData.error?.message ?? "Failed to create onboarding link");
+		}
+		return { url: linkData.url };
+	});
+
+export const getShopStripeStatus = createServerFn({ method: "GET" })
+	.handler(async () => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+
+		const shop = await (await db())
+			.select({ stripeAccountId: shops.stripeAccountId, depositAmount: shops.depositAmount, appointmentsPublic: shops.appointmentsPublic })
+			.from(shops).where(eq(shops.ownerId, userId)).limit(1).all();
+		if (!shop[0]) return null;
+
+		let stripeEnabled = false;
+		if (shop[0].stripeAccountId) {
+			const mod = await import("cloudflare:workers");
+			const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+			const res = await fetch(`https://api.stripe.com/v1/accounts/${shop[0].stripeAccountId}`, {
+				headers: { Authorization: `Bearer ${stripeKey}` },
+			});
+			const acc = await res.json() as { charges_enabled?: boolean };
+			stripeEnabled = acc.charges_enabled ?? false;
+		}
+
+		return { ...shop[0], stripeEnabled };
+	});
+
+export const updateShopDepositSettings = createServerFn({ method: "POST" })
+	.inputValidator((input: { depositAmount: number; appointmentsPublic: boolean }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const shop = await (await db()).select({ id: shops.id }).from(shops).where(eq(shops.ownerId, userId)).limit(1).all();
+		if (!shop[0]) throw new Error("Shop not found");
+		await (await db()).update(shops).set({ depositAmount: data.depositAmount, appointmentsPublic: data.appointmentsPublic }).where(eq(shops.id, shop[0].id));
+		return { success: true };
+	});
+
+export const toggleBarberDirectPayment = createServerFn({ method: "POST" })
+	.inputValidator((input: { barberId: number; shopId: number; enabled: boolean }) => input)
+	.handler(async ({ data }) => {
+		const userId = await getUserId();
+		if (!userId) throw new Error("Not authenticated");
+		const shop = await (await db()).select({ id: shops.id }).from(shops).where(and(eq(shops.id, data.shopId), eq(shops.ownerId, userId))).limit(1).all();
+		if (!shop[0]) throw new Error("Not authorized");
+		await (await db()).update(barbers).set({ stripePayoutsEnabled: data.enabled }).where(and(eq(barbers.id, data.barberId), eq(barbers.shopId, data.shopId)));
+		return { success: true };
+	});
+
+// ============ APPOINTMENT WITH DEPOSIT ============
+
+export const createAppointmentWithDeposit = createServerFn({ method: "POST" })
+	.inputValidator((input: {
+		shopId: number;
+		barberId: number;
+		clientName: string;
+		clientPhone: string;
+		date: string;
+		time: string;
+		clientAccountId: number;
+	}) => input)
+	.handler(async ({ data }) => {
+		const mod = await import("cloudflare:workers");
+		const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+		const origin = "https://goolinext.com";
+
+		// Get shop + barber stripe info
+		const shop = await (await db())
+			.select({ name: shops.name, address: shops.address, stripeAccountId: shops.stripeAccountId, depositAmount: shops.depositAmount, googleReviewLink: shops.googleReviewLink })
+			.from(shops).where(eq(shops.id, data.shopId)).limit(1).all();
+		if (!shop[0]) throw new Error("Shop not found");
+
+		const barber = await (await db())
+			.select({ name: barbers.name, stripeAccountId: barbers.stripeAccountId, stripePayoutsEnabled: barbers.stripePayoutsEnabled })
+			.from(barbers).where(eq(barbers.id, data.barberId)).limit(1).all();
+		if (!barber[0]) throw new Error("Barber not found");
+
+		// Determine which Stripe account receives payment
+		const destinationAccount = barber[0].stripePayoutsEnabled && barber[0].stripeAccountId
+			? barber[0].stripeAccountId
+			: shop[0].stripeAccountId;
+
+		if (!destinationAccount) throw new Error("STRIPE_NOT_CONNECTED");
+
+		// Generate cancel token
+		const cancelTokenBytes = new Uint8Array(16);
+		crypto.getRandomValues(cancelTokenBytes);
+		const cancelToken = Array.from(cancelTokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+
+		// Get or create client
+		const existingClient = await (await db())
+			.select({ id: clients.id })
+			.from(clients)
+			.where(and(eq(clients.shopId, data.shopId), eq(clients.phone, data.clientPhone)))
+			.limit(1).all();
+
+		let clientId: number;
+		if (existingClient[0]) {
+			clientId = existingClient[0].id;
+		} else {
+			const newClient = await (await db())
+				.insert(clients)
+				.values({ shopId: data.shopId, name: data.clientName, phone: data.clientPhone })
+				.returning({ id: clients.id }).all();
+			clientId = newClient[0].id;
+		}
+
+		// Create appointment record first
+		const appt = await (await db())
+			.insert(appointments)
+			.values({
+				shopId: data.shopId,
+				barberId: data.barberId,
+				clientId,
+				clientName: data.clientName,
+				clientPhone: data.clientPhone,
+				appointmentDate: data.date,
+				appointmentTime: data.time,
+				cancelToken,
+				clientUserId: data.clientAccountId,
+				depositAmount: shop[0].depositAmount ?? 1059,
+			})
+			.returning().all();
+
+		const apptId = appt[0].id;
+		const depositAmount = shop[0].depositAmount ?? 1059;
+
+		// Create Stripe Checkout Session with direct charge to destination
+		// Base deposit = $10.00 (1000 cents), service fee = $0.59 (59 cents)
+		const baseDeposit = 1000;
+		const serviceFee = 59;
+
+		const params = new URLSearchParams({
+			"mode": "payment",
+			"payment_method_types[0]": "card",
+			"line_items[0][price_data][currency]": "usd",
+			"line_items[0][price_data][product_data][name]": `Appointment Deposit - ${shop[0].name}`,
+			"line_items[0][price_data][product_data][description]": `${barber[0].name} · ${data.date} ${data.time}`,
+			"line_items[0][price_data][unit_amount]": String(baseDeposit),
+			"line_items[0][quantity]": "1",
+			"line_items[1][price_data][currency]": "usd",
+			"line_items[1][price_data][product_data][name]": "Service fee",
+			"line_items[1][price_data][unit_amount]": String(serviceFee),
+			"line_items[1][quantity]": "1",
+			"success_url": `${origin}/appointment/${data.shopId}?payment=success&appt=${apptId}&token=${cancelToken}`,
+			"cancel_url": `${origin}/appointment/${data.shopId}?payment=cancelled`,
+			"metadata[appointmentId]": String(apptId),
+			"metadata[cancelToken]": cancelToken,
+			"metadata[shopId]": String(data.shopId),
+			"payment_intent_data[transfer_data][destination]": destinationAccount,
+			"payment_intent_data[transfer_data][amount]": String(baseDeposit),
+			"payment_intent_data[metadata][appointmentId]": String(apptId),
+		});
+
+		const sessionRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+			method: "POST",
+			headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+			body: params,
+		});
+		const session = await sessionRes.json() as { url?: string; error?: { message: string } };
+		if (!sessionRes.ok) throw new Error(session.error?.message ?? "Stripe error");
+
+		return {
+			checkoutUrl: session.url,
+			appointmentId: apptId,
+			cancelToken,
+			shopName: shop[0].name,
+			barberName: barber[0].name,
+			date: data.date,
+			time: data.time,
+			address: shop[0].address,
+		};
+	});
+
+// Handle successful payment return
+export const confirmAppointmentPayment = createServerFn({ method: "POST" })
+	.inputValidator((input: { appointmentId: number; cancelToken: string }) => input)
+	.handler(async ({ data }) => {
+		const appt = await (await db())
+			.select()
+			.from(appointments)
+			.where(and(eq(appointments.id, data.appointmentId), eq(appointments.cancelToken, data.cancelToken)))
+			.limit(1).all();
+		if (!appt[0]) throw new Error("Not found");
+
+		// Get payment intent from Stripe checkout session
+		const mod = await import("cloudflare:workers");
+		const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+
+		// Find the payment intent via metadata search
+		const piRes = await fetch(`https://api.stripe.com/v1/payment_intents?limit=5`, {
+			headers: { Authorization: `Bearer ${stripeKey}` },
+		});
+		// Mark deposit as paid
+		await (await db()).update(appointments).set({ depositPaid: true }).where(eq(appointments.id, data.appointmentId));
+
+		const barber = await (await db()).select({ name: barbers.name }).from(barbers).where(eq(barbers.id, appt[0].barberId)).limit(1).all();
+		const shop = await (await db()).select({ name: shops.name, address: shops.address }).from(shops).where(eq(shops.id, appt[0].shopId)).limit(1).all();
+
+		return {
+			success: true,
+			shopName: shop[0]?.name,
+			barberName: barber[0]?.name,
+			date: appt[0].appointmentDate,
+			time: appt[0].appointmentTime,
+			address: shop[0]?.address,
+			cancelToken: data.cancelToken,
+		};
+	});
+
+// Cancel via token (public — no auth needed)
+export const cancelAppointmentByToken = createServerFn({ method: "POST" })
+	.inputValidator((input: { cancelToken: string }) => input)
+	.handler(async ({ data }) => {
+		const appt = await (await db())
+			.select()
+			.from(appointments)
+			.where(eq(appointments.cancelToken, data.cancelToken))
+			.limit(1).all();
+		if (!appt[0]) throw new Error("Not found");
+		if (appt[0].status === "cancelled") return { success: true, alreadyCancelled: true };
+
+		const apptTime = new Date(`${appt[0].appointmentDate}T${appt[0].appointmentTime}:00`);
+		const diffHours = (apptTime.getTime() - Date.now()) / (1000 * 60 * 60);
+
+		await (await db()).update(appointments).set({ status: "cancelled" }).where(eq(appointments.id, appt[0].id));
+
+		let refunded = false;
+		if (diffHours > 1 && appt[0].stripePaymentIntentId && appt[0].depositPaid) {
+			const mod = await import("cloudflare:workers");
+			const stripeKey = (mod.env as Record<string, string>).STRIPE_SECRET_KEY;
+			const res = await fetch("https://api.stripe.com/v1/refunds", {
+				method: "POST",
+				headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+				body: new URLSearchParams({ payment_intent: appt[0].stripePaymentIntentId }),
+			});
+			if (res.ok) refunded = true;
+		}
+
+		return { success: true, refunded, lostDeposit: !refunded && appt[0].depositPaid };
 	});

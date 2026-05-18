@@ -1,396 +1,451 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { getActiveBarbers, getShopPublicFull, getShopLogo, getAvailableSlots, createAppointment } from "@/lib/server-fns";
+import { useState, useEffect, useRef } from "react";
+import { getActiveBarbers, getShopPublicFull, getShopLogo } from "@/lib/server-fns";
 
-export const Route = createFileRoute("/biz/$shopId")({
-	component: BusinessPage,
-});
+export const Route = createFileRoute("/biz/$shopId")({ component: BizPage });
 
-const DAY_EN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const DAY_ES = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-
-function fmt12(t: string) {
-	const [h, m] = t.split(":").map(Number);
-	const ampm = h >= 12 ? "PM" : "AM";
-	const hour = h % 12 || 12;
-	return `${hour}:${m.toString().padStart(2,"0")} ${ampm}`;
+function t12(s: string) {
+	const [h, m] = s.split(":").map(Number);
+	return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-function BusinessPage() {
+const DAYS_EN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const DAYS_ES = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+
+function isOpen(wh: any, today: number) {
+	const h = wh?.[today];
+	if (!h || h.closed) return false;
+	try {
+		const now = new Date();
+		const nowM = now.getHours() * 60 + now.getMinutes();
+		const [oH, oM] = (h.open || "09:00").split(":").map(Number);
+		const [cH, cM] = (h.close || "18:00").split(":").map(Number);
+		const openM = oH * 60 + oM;
+		let closeM = cH * 60 + cM;
+		if (closeM < openM) closeM += 1440;
+		return nowM >= openM && nowM < closeM;
+	} catch { return false; }
+}
+
+export default function BizPage() {
 	const { shopId } = Route.useParams();
 	const id = Number(shopId);
-	const [lang, setLang] = useState<"en"|"es">("en");
-	const [showApptForm, setShowApptForm] = useState(false);
-	const [apptStep, setApptStep] = useState(1); // 1=select barber/date, 2=select time, 3=client info, 4=confirmed
-	const [apptBarber, setApptBarber] = useState(0);
-	const [apptDate, setApptDate] = useState("");
-	const [apptTime, setApptTime] = useState("");
-	const [apptName, setApptName] = useState("");
-	const [apptPhone, setApptPhone] = useState("");
-	const [apptLoading, setApptLoading] = useState(false);
+	const [lang, setLang] = useState<"en" | "es">("en");
+	const [scrollY, setScrollY] = useState(0);
+	const [activeBarber, setActiveBarber] = useState(0);
+	const [imgError, setImgError] = useState<Record<number, boolean>>({});
+	const [reviewMode, setReviewMode] = useState(false);
+	const [voted, setVoted] = useState<"complaint"|"review"|null>(null);
 
-	const { data: shop, isLoading } = useQuery({
-		queryKey: ["shopPublicFull", id],
-		queryFn: () => getShopPublicFull({ data: { shopId: id } }),
-	});
+	useEffect(() => {
+		const params = new URLSearchParams(window.location.search);
+		if (params.get("review") === "1") setReviewMode(true);
+	}, []);
+	const heroRef = useRef<HTMLDivElement>(null);
 
-	const { data: logoUrl } = useQuery({
-		queryKey: ["shopLogo", id],
-		queryFn: () => getShopLogo({ data: { shopId: id } }),
-		enabled: !!shop,
-	});
+	const { data: shop, isLoading } = useQuery({ queryKey: ["spf", id], queryFn: () => getShopPublicFull({ data: { shopId: id } }) });
+	const { data: logo } = useQuery({ queryKey: ["logo", id], queryFn: () => getShopLogo({ data: { shopId: id } }), enabled: !!shop });
+	const { data: barbers } = useQuery({ queryKey: ["ab", id], queryFn: () => getActiveBarbers({ data: { shopId: id } }), enabled: !!shop });
 
-	const { data: barberList } = useQuery({
-		queryKey: ["activeBarbers", id],
-		queryFn: () => getActiveBarbers({ data: { shopId: id } }),
-		enabled: !!shop,
-	});
+	useEffect(() => {
+		const onScroll = () => setScrollY(window.scrollY);
+		window.addEventListener("scroll", onScroll, { passive: true });
+		return () => window.removeEventListener("scroll", onScroll);
+	}, []);
 
-	const { data: availableSlots } = useQuery({
-		queryKey: ["availableSlots", id, apptBarber, apptDate],
-		queryFn: () => getAvailableSlots({ data: { shopId: id, barberId: apptBarber, date: apptDate } }),
-		enabled: !!apptBarber && !!apptDate,
-	});
+	const wh = shop?.weeklyHours ? JSON.parse(shop.weeklyHours) : null;
+	const [translatedMsg, setTranslatedMsg] = useState<string>("");
 
-	const T = {
-		en: { tagline: "Professional Style", sub: "Where every detail of your image reflects who you are and the level you belong to", call: "Call Now", reviews: "Reviews", findUs: "FIND US", team: "OUR TEAM", today: "TODAY", address: "ADDRESS", phone: "PHONE", googleReviews: "GOOGLE REVIEWS", leaveReview: "Leave us a review ⭐", available: "Available Today", off: "Not Today", hours: "HOURS", open: "Open", closed: "Closed", barbers: "barbers available", barber: "barber available", poweredBy: "Powered by", poweredSub: "Queue management for modern barbershops", openNow: "Open Now", closedNow: "Closed Now", bookAppt: "Book Appointment", selectBarber: "Select Barber", selectDate: "Select Date", selectTime: "Select Time", yourName: "Your Name", yourPhone: "Your Phone", confirmAppt: "Confirm Appointment", apptConfirmed: "Appointment Confirmed!", apptConfirmedMsg: "We will see you soon!", back: "Back", next: "Next" },
-		es: { tagline: "Estilo Profesional", sub: "Donde cada detalle de tu imagen refleja quién eres y el nivel al que perteneces", call: "Llamar", reviews: "Reseñas", findUs: "ENCUÉNTRANOS", team: "NUESTRO EQUIPO", today: "HOY", address: "DIRECCIÓN", phone: "TELÉFONO", googleReviews: "RESEÑAS DE GOOGLE", leaveReview: "Déjanos una reseña ⭐", available: "Disponible Hoy", off: "No Disponible", hours: "HORARIO", open: "Abierto", closed: "Cerrado", barbers: "barberos disponibles", barber: "barbero disponible", poweredBy: "Con tecnología de", poweredSub: "Gestión de turnos para barberías modernas", openNow: "Abierto Ahora", closedNow: "Cerrado Ahora", bookAppt: "Reservar Cita", selectBarber: "Seleccionar Barbero", selectDate: "Seleccionar Fecha", selectTime: "Seleccionar Hora", yourName: "Tu Nombre", yourPhone: "Tu Teléfono", confirmAppt: "Confirmar Cita", apptConfirmed: "¡Cita Confirmada!", apptConfirmedMsg: "¡Te esperamos pronto!", back: "Atrás", next: "Siguiente" },
-	}[lang];
+	// Translate welcome message when shop loads or lang changes to ES
+	useEffect(() => {
+		const msgEn = shop?.welcomeMessageEn;
+		if (!msgEn || lang !== "es") return;
+		setTranslatedMsg("..."); // show loading
+		fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(msgEn) + "&langpair=en%7Ces")
+			.then(r => r.json())
+			.then((d: any) => {
+				const t = d?.responseData?.translatedText;
+				setTranslatedMsg(t && t.length > 3 ? t : msgEn);
+			})
+			.catch(() => setTranslatedMsg(msgEn));
+	}, [lang, shop?.welcomeMessageEn]);
+	const today = new Date().getDay();
+	const open = isOpen(wh, today);
+	const todayH = wh?.[today];
+	const navSolid = scrollY > 50;
+	const currentBarber = barbers?.[activeBarber];
 
-	const DAY = lang === "es" ? DAY_ES : DAY_EN;
+	if (reviewMode && shop) {
+		const waNum = (shop as any).whatsappNumber;
+		const waUrl = waNum ? "https://wa.me/" + waNum.replace(/[^0-9]/g,"") + "?text=" + encodeURIComponent(lang === "es" ? "Hola, tengo un comentario sobre " + shop.name : "Hello, I have a comment about " + shop.name) : null;
+		const R = lang === "es" ? {
+			title:"¿Cómo fue tu experiencia?",sub:"Tu opinión nos importa",
+			c1:"Tengo una queja",c1s:"Hablar con el propietario por WhatsApp",
+			c2:"¡Estoy complacido! Dejar reseña",c2s:"Compartir en Google Reviews",
+			t1:"Gracias por hacérnoslo saber",m1:"El propietario te contactará pronto.",
+			t2:"¡Muchas gracias!",m2:"Tu reseña nos ayuda a crecer.",
+		} : {
+			title:"How was your experience?",sub:"Your opinion matters to us",
+			c1:"I have a complaint",c1s:"Talk to the owner on WhatsApp",
+			c2:"I'm happy! Leave a review",c2s:"Share on Google Reviews",
+			t1:"Thank you for letting us know",m1:"The owner will contact you shortly.",
+			t2:"Thank you so much!",m2:"Your review helps us grow.",
+		};
+		return (
+			<div style={{minHeight:"100vh",background:"linear-gradient(135deg,#f8faff,#fff,#f0f7ff)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 16px",fontFamily:"system-ui,sans-serif"}}>
+				<style>{`.rv-btn{transition:all 0.2s;cursor:pointer;border:none;background:transparent;width:100%;text-align:left}.rv-btn:hover{transform:translateY(-2px)}`}</style>
+				<div style={{position:"fixed",top:16,right:16,display:"flex",gap:6,zIndex:100}}>
+					{(["en","es"] as const).map(l=><button key={l} type="button" onClick={()=>setLang(l)} style={{padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:lang===l?"#4285F4":"rgba(0,0,0,0.06)",color:lang===l?"white":"#5f6368"}}>{l.toUpperCase()}</button>)}
+				</div>
+				<div style={{width:"100%",maxWidth:400}}>
+					<div style={{background:"white",borderRadius:24,boxShadow:"0 4px 24px rgba(0,0,0,0.08)",padding:"28px 24px",marginBottom:16,textAlign:"center"}}>
+						<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:14}}>
+							<svg width="26" height="26" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.1 34.8 29.5 38 24 38c-7.7 0-14-6.3-14-14s6.3-14 14-14c3.4 0 6.5 1.2 8.9 3.2l6.4-6.4C35.2 3.5 29.9 1 24 1 11.3 1 1 11.3 1 24s10.3 23 23 23c12.9 0 22-9.1 22-23 0-1.5-.2-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15.2 16 19.3 13 24 13c3.4 0 6.5 1.2 8.9 3.2l6.4-6.4C35.2 3.5 29.9 1 24 1 16.3 1 9.7 5.6 6.3 14.7z"/><path fill="#FBBC05" d="M24 47c5.7 0 10.9-1.9 14.9-5.1l-6.9-5.7C29.8 38 27 39 24 39c-5.5 0-10.2-3.3-12.2-8L5 36.2C8.5 43 15.7 47 24 47z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.5-2.6 4.6-4.8 6l6.9 5.7C42.3 36.7 45 30.8 45 24c0-1.5-.2-2.7-.5-4z"/></svg>
+							<span style={{fontSize:16,fontWeight:600,color:"#3c4043"}}>Google Reviews</span>
+						</div>
+						{logo && <img src={logo} alt={shop.name} style={{width:52,height:52,borderRadius:13,objectFit:"cover",margin:"0 auto 10px",display:"block",border:"2px solid #f1f3f4"}}/>}
+						<h1 style={{fontSize:19,fontWeight:700,color:"#202124",marginBottom:4}}>{shop.name}</h1>
+						<p style={{fontSize:13,color:"#5f6368"}}>{R.sub}</p>
+						<div style={{display:"flex",justifyContent:"center",gap:3,marginTop:10}}>{[1,2,3,4,5].map(s=><span key={s} style={{fontSize:20,color:"#FBBC05"}}>★</span>)}</div>
+					</div>
+					<h2 style={{textAlign:"center",fontSize:16,fontWeight:600,color:"#202124",marginBottom:14}}>{R.title}</h2>
+					{voted === null ? (
+						<div style={{display:"flex",flexDirection:"column",gap:12}}>
+							{waUrl && <button type="button" className="rv-btn" onClick={()=>{setVoted("complaint");setTimeout(()=>window.open(waUrl,"_blank"),300);}}>
+								<div style={{background:"white",borderRadius:18,boxShadow:"0 2px 12px rgba(0,0,0,0.08)",padding:"16px 20px",display:"flex",alignItems:"center",gap:14,border:"2px solid transparent"}} onMouseEnter={e=>(e.currentTarget.style.borderColor="#25D366")} onMouseLeave={e=>(e.currentTarget.style.borderColor="transparent")}>
+									<div style={{width:46,height:46,borderRadius:13,background:"linear-gradient(135deg,#25D366,#128C7E)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+										<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.524 5.845L.057 23.887a.5.5 0 0 0 .616.616l6.04-1.467A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.9a9.888 9.888 0 0 1-5.035-1.375l-.361-.214-3.733.907.923-3.635-.235-.374A9.862 9.862 0 0 1 2.1 12C2.1 6.532 6.532 2.1 12 2.1S21.9 6.532 21.9 12 17.468 21.9 12 21.9z"/></svg>
+									</div>
+									<div><p style={{fontSize:15,fontWeight:700,color:"#202124",marginBottom:2}}>{R.c1}</p><p style={{fontSize:12,color:"#5f6368"}}>{R.c1s}</p></div>
+									<span style={{marginLeft:"auto",color:"#bdc1c6",fontSize:18}}>›</span>
+								</div>
+							</button>}
+							{shop.googleReviewLink && <button type="button" className="rv-btn" onClick={()=>{setVoted("review");setTimeout(()=>window.open(shop.googleReviewLink!,"_blank"),300);}}>
+								<div style={{background:"white",borderRadius:18,boxShadow:"0 2px 12px rgba(0,0,0,0.08)",padding:"16px 20px",display:"flex",alignItems:"center",gap:14,border:"2px solid transparent"}} onMouseEnter={e=>(e.currentTarget.style.borderColor="#4285F4")} onMouseLeave={e=>(e.currentTarget.style.borderColor="transparent")}>
+									<div style={{width:46,height:46,borderRadius:13,background:"white",border:"2px solid #e8eaed",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+										<svg width="22" height="22" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.1 34.8 29.5 38 24 38c-7.7 0-14-6.3-14-14s6.3-14 14-14c3.4 0 6.5 1.2 8.9 3.2l6.4-6.4C35.2 3.5 29.9 1 24 1 11.3 1 1 11.3 1 24s10.3 23 23 23c12.9 0 22-9.1 22-23 0-1.5-.2-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15.2 16 19.3 13 24 13c3.4 0 6.5 1.2 8.9 3.2l6.4-6.4C35.2 3.5 29.9 1 24 1 16.3 1 9.7 5.6 6.3 14.7z"/><path fill="#FBBC05" d="M24 47c5.7 0 10.9-1.9 14.9-5.1l-6.9-5.7C29.8 38 27 39 24 39c-5.5 0-10.2-3.3-12.2-8L5 36.2C8.5 43 15.7 47 24 47z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.5-2.6 4.6-4.8 6l6.9 5.7C42.3 36.7 45 30.8 45 24c0-1.5-.2-2.7-.5-4z"/></svg>
+									</div>
+									<div><p style={{fontSize:15,fontWeight:700,color:"#202124",marginBottom:2}}>{R.c2}</p><p style={{fontSize:12,color:"#5f6368"}}>{R.c2s}</p></div>
+									<span style={{marginLeft:"auto",color:"#bdc1c6",fontSize:18}}>›</span>
+								</div>
+							</button>}
+						</div>
+					) : (
+						<div style={{background:"white",borderRadius:24,boxShadow:"0 4px 24px rgba(0,0,0,0.08)",padding:"36px 24px",textAlign:"center"}}>
+							<div style={{width:54,height:54,borderRadius:"50%",background:voted==="review"?"#E8F5E9":"#E3F2FD",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
+								<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={voted==="review"?"#22c55e":"#4285F4"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+							</div>
+							<h2 style={{fontSize:19,fontWeight:700,color:"#202124",marginBottom:8}}>{voted==="review"?R.t2:R.t1}</h2>
+							<p style={{fontSize:14,color:"#5f6368",lineHeight:1.6}}>{voted==="review"?R.m2:R.m1}</p>
+						</div>
+					)}
+					<p style={{textAlign:"center",fontSize:11,color:"#bdc1c6",marginTop:20}}>Powered by Goolinext</p>
+				</div>
+			</div>
+		);
+	}
 
 	if (isLoading) return (
-		<div style={{ minHeight:"100vh", background:"#070709", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"system-ui,sans-serif" }}>
-			<div style={{ textAlign:"center" }}>
-				<div style={{ width:44,height:44,border:"2px solid #f97316",borderTopColor:"transparent",borderRadius:"50%",margin:"0 auto 16px",animation:"spin 0.8s linear infinite" }} />
-				<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-				<p style={{ color:"#64748b",fontSize:13 }}>Loading...</p>
-			</div>
+		<div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+			<div style={{ width: 40, height: 40, border: "2px solid rgba(255,255,255,0.05)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+			<style>{`@keyframes spin{to{transform:rotate(360deg)}}
+				`}</style>
 		</div>
 	);
-
-	if (!shop) return (
-		<div style={{ minHeight:"100vh", background:"#070709", display:"flex", alignItems:"center", justifyContent:"center" }}>
-			<p style={{ color:"#475569", fontFamily:"system-ui" }}>Business not found.</p>
-		</div>
-	);
-
-	const todayIdx = new Date().getDay();
-	const allBarbers = barberList ?? [];
-	const todayBarbers = allBarbers.filter(b => {
-		const days = JSON.parse(b.workDays ?? "[0,1,2,3,4,5,6]") as number[];
-		return days.includes(todayIdx) && !b.onVacation;
-	});
-
-	type DayHours = { open: string; close: string; closed: boolean };
-	const weeklyHours: Record<number, DayHours> = shop.weeklyHours
-		? JSON.parse(shop.weeklyHours)
-		: {};
-	const todayHours: DayHours = weeklyHours[todayIdx] ?? { open: "09:00", close: "19:00", closed: false };
-	const now = new Date();
-	const nowMins = now.getHours()*60 + now.getMinutes();
-	const openMins = parseInt(todayHours.open.split(":")[0])*60 + parseInt(todayHours.open.split(":")[1]);
-	const closeMins = parseInt(todayHours.close.split(":")[0])*60 + parseInt(todayHours.close.split(":")[1]);
-	const isOpenNow = !todayHours.closed && nowMins >= openMins && nowMins < closeMins && todayBarbers.length > 0;
+	if (!shop) return null;
 
 	return (
-		<div style={{ minHeight:"100vh", background:"#070709", color:"white", fontFamily:"'DM Sans',system-ui,sans-serif", overflowX:"hidden" }}>
+		<div style={{ minHeight: "100vh", background: "#0a0a0a", color: "white", fontFamily: "'Inter',system-ui,sans-serif", overflowX: "hidden" }}>
 			<style>{`
-				@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap');
+				@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 				*{box-sizing:border-box;margin:0;padding:0}
+				html{scroll-behavior:smooth}
+				::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:#0a0a0a}::-webkit-scrollbar-thumb{background:#333}
+				@keyframes spin{to{transform:rotate(360deg)}}
+				
 				@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 				@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-				.fi{animation:fadeUp 0.6s ease forwards;opacity:0}
-				.fi-1{animation-delay:0.05s}.fi-2{animation-delay:0.15s}.fi-3{animation-delay:0.25s}.fi-4{animation-delay:0.35s}.fi-5{animation-delay:0.45s}
-				.card{display:flex;align-items:center;gap:14px;padding:18px 20px;border-radius:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);margin-bottom:10px;text-decoration:none;color:white;transition:border-color 0.2s,transform 0.2s}
-				.card:hover{border-color:rgba(249,115,22,0.35);transform:translateY(-1px)}
-				.icon-box{width:44px;height:44px;border-radius:12px;background:rgba(249,115,22,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-				.divider{display:flex;align-items:center;gap:10px;margin:32px 0 20px}
-				.divider span{font-size:10px;font-weight:800;letter-spacing:0.22em;color:#f97316;white-space:nowrap}
-				.divider div{flex:1;height:1px;background:rgba(249,115,22,0.2)}
-				.barber-card{padding:20px 14px;border-radius:18px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);text-align:center;transition:border-color 0.2s,transform 0.2s}
-				.barber-card:hover{border-color:rgba(249,115,22,0.3);transform:translateY(-2px)}
-				.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:14px;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-weight:700;font-size:14px;text-decoration:none;border:none;cursor:pointer;box-shadow:0 8px 28px rgba(249,115,22,0.3);transition:all 0.2s}
-				.btn-primary:hover{box-shadow:0 12px 40px rgba(249,115,22,0.45);transform:translateY(-1px)}
-				.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:14px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.3);color:#fb923c;font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;transition:all 0.2s}
-				.btn-secondary:hover{background:rgba(249,115,22,0.18)}
-				.lang-btn{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:all 0.2s}
+				@keyframes float{0%,100%{transform:translateY(0px)}50%{transform:translateY(-6px)}}
+				@keyframes slideRight{from{width:0}to{width:100%}}
+				.a1{animation:fadeUp 0.7s ease 0.1s both}
+				.a2{animation:fadeUp 0.7s ease 0.2s both}
+				.a3{animation:fadeUp 0.7s ease 0.35s both}
+				.a4{animation:fadeUp 0.7s ease 0.5s both}
+				.a5{animation:fadeUp 0.7s ease 0.65s both}
+				.barber-tab{transition:all 0.25s ease;cursor:pointer;border:none;background:transparent;text-align:left;width:100%}
+				.barber-tab:hover .tab-name{color:white!important}
+				.cta1{display:inline-block;transition:all 0.3s ease;text-decoration:none}
+				.cta1:hover{transform:scale(1.03)}
+				.cta2{transition:all 0.3s ease;cursor:pointer}
+				.cta2:hover{background:rgba(255,255,255,0.1)!important;border-color:rgba(255,255,255,0.3)!important}
+				.stat-card{transition:all 0.3s ease}
+				.stat-card:hover{background:rgba(255,255,255,0.06)!important;border-color:rgba(255,255,255,0.15)!important}
+				.day-item{transition:background 0.2s ease}
+				.day-item:hover{background:rgba(255,255,255,0.03)!important}
+				@media(max-width:768px){
+					.two-col{grid-template-columns:1fr!important}
+					.hero-title{font-size:clamp(3rem,15vw,5rem)!important}
+					.stats-grid{grid-template-columns:repeat(2,1fr)!important}
+				}
 			`}</style>
 
-			{/* Language toggle */}
-			<div style={{ position:"fixed",top:16,right:16,zIndex:100,display:"flex",gap:6 }}>
-				<button className="lang-btn" onClick={() => setLang("en")} style={{ background: lang==="en" ? "#f97316" : "rgba(255,255,255,0.08)", color: lang==="en" ? "white" : "#64748b" }}>EN</button>
-				<button className="lang-btn" onClick={() => setLang("es")} style={{ background: lang==="es" ? "#f97316" : "rgba(255,255,255,0.08)", color: lang==="es" ? "white" : "#64748b" }}>ES</button>
-			</div>
-
-			{/* HERO */}
-			<div style={{ position:"relative",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"80px 24px 60px",textAlign:"center",overflow:"hidden" }}>
-				<div style={{ position:"absolute",inset:0,background:"radial-gradient(ellipse 80% 55% at 50% 0%,rgba(249,115,22,0.12) 0%,transparent 70%)",pointerEvents:"none" }} />
-				<div style={{ position:"absolute",inset:0,opacity:0.025,backgroundImage:"linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px)",backgroundSize:"60px 60px",pointerEvents:"none" }} />
-				<div style={{ position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:1,height:100,background:"linear-gradient(to bottom,rgba(249,115,22,0.6),transparent)" }} />
-
-				{/* Logo */}
-				<div className="fi fi-1" style={{ position:"relative",marginBottom:28 }}>
-					<div style={{ width:96,height:96,borderRadius:26,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",border:"2px solid rgba(249,115,22,0.3)",boxShadow:"0 0 70px rgba(249,115,22,0.25)" }}>
-						{logoUrl ? (
-							<img src={logoUrl} alt={shop.name} style={{ width:"100%",height:"100%",objectFit:"cover" }} />
-						) : (
-							<div style={{ width:"100%",height:"100%",background:"linear-gradient(135deg,#f97316,#ea580c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40 }}>
-								✂️
-							</div>
-						)}
-					</div>
-					<div style={{ position:"absolute",bottom:-4,right:-4,background:isOpenNow?"#10b981":"#ef4444",borderRadius:20,padding:"3px 10px",fontSize:9,fontWeight:800,color:"white",border:"2px solid #070709",display:"flex",alignItems:"center",gap:4 }}>
-						<div style={{ width:5,height:5,borderRadius:"50%",background:"white",animation:"pulse 1.5s ease-in-out infinite" }} />
-						{isOpenNow ? T.openNow.toUpperCase() : T.closedNow.toUpperCase()}
-					</div>
+			{/* NAV */}
+			<nav style={{
+				position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+				display: "flex", alignItems: "center", justifyContent: "space-between",
+				padding: "0 clamp(20px,5vw,64px)", height: 64,
+				background: navSolid ? "rgba(10,10,10,0.92)" : "transparent",
+				backdropFilter: navSolid ? "blur(20px)" : "none",
+				borderBottom: navSolid ? "1px solid rgba(255,255,255,0.06)" : "none",
+				transition: "all 0.3s ease",
+			}}>
+				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+					{logo
+						? <img src={logo} style={{ width: 32, height: 32, borderRadius: 8, objectFit: "cover" }} alt="" />
+						: <div style={{ width: 32, height: 32, borderRadius: 8, background: "white", display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0a", fontWeight: 800, fontSize: 14 }}>{shop.name[0]}</div>
+					}
+					<span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.02em" }}>{shop.name}</span>
 				</div>
-
-				<div className="fi fi-2">
-					<p style={{ fontSize:10,fontWeight:800,letterSpacing:"0.25em",color:"#f97316",marginBottom:10 }}>✦ {T.tagline.toUpperCase()} ✦</p>
-					<h1 style={{ fontFamily:"'Playfair Display',serif",fontSize:"clamp(2.4rem,9vw,4.5rem)",fontWeight:900,lineHeight:1.05,marginBottom:14,background:"linear-gradient(135deg,#fff 0%,#e2e8f0 60%,#94a3b8 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text" }}>
-						{shop.name}
-					</h1>
-					<p style={{ fontSize:14,color:"#64748b",maxWidth:380,margin:"0 auto 36px",lineHeight:1.65 }}>{T.sub}</p>
-				</div>
-
-				<div className="fi fi-3" style={{ display:"flex",gap:10,flexWrap:"wrap",justifyContent:"center" }}>
-					{shop.phone && (
-						<a href={`tel:${shop.phone}`} className="btn-primary">📞 {T.call}</a>
+				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+					{open && (
+						<div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
+							<div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", animation: "pulse 1.5s ease infinite" }} />
+							<span style={{ fontSize: 10, color: "#22c55e", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{lang === "en" ? "Open" : "Abierto"}</span>
+						</div>
 					)}
-					{shop.googleReviewLink && (
-						<a href={shop.googleReviewLink} target="_blank" rel="noopener noreferrer" className="btn-secondary">⭐ {T.reviews}</a>
-					)}
-					<button
-						type="button"
-						onClick={() => { setShowApptForm(true); setApptStep(1); }}
-						className="btn-primary"
-						style={{ background:"linear-gradient(135deg,#6366f1,#4f46e5)",boxShadow:"0 8px 28px rgba(99,102,241,0.35)" }}
-					>
-						📅 {T.bookAppt}
+					<button onClick={() => setLang(l => l === "en" ? "es" : "en")} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#a8997a", fontSize: 11, fontWeight: 600, cursor: "pointer", letterSpacing: 1 }}>
+						{lang === "en" ? "ES" : "EN"}
 					</button>
 				</div>
+			</nav>
 
-				<div style={{ position:"absolute",bottom:28,left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:6,opacity:0.3 }}>
-					<p style={{ fontSize:10,letterSpacing:"0.15em",color:"#64748b" }}>SCROLL</p>
-					<div style={{ width:1,height:36,background:"linear-gradient(to bottom,#64748b,transparent)" }} />
+			{/* ── HERO ── */}
+			<section ref={heroRef} style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 clamp(20px,5vw,64px) 80px", position: "relative", overflow: "hidden" }}>
+				{/* Background texture */}
+				<div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 60% 40%, rgba(255,255,255,0.03) 0%, transparent 70%)" }} />
+				<div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 1px,transparent 1px)", backgroundSize: "48px 48px", opacity: 0.5 }} />
+				{/* Big background number */}
+				<div style={{ position: "absolute", right: "5%", top: "50%", transform: "translateY(-50%)", fontSize: "clamp(200px,40vw,500px)", fontWeight: 900, color: "rgba(255,255,255,0.02)", lineHeight: 1, userSelect: "none", letterSpacing: "-0.05em" }}>01</div>
+
+				<div style={{ position: "relative", zIndex: 2, maxWidth: 1000 }}>
+					{/* Top label */}
+					<div className="a1" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+						<div style={{ width: 32, height: 1, background: "#8a9bb5" }} />
+						<span style={{ fontSize: 11, fontWeight: 600, color: "#a8997a", letterSpacing: 3, textTransform: "uppercase" }}>
+							{barbers?.length || 0} {lang === "en" ? "specialists" : "especialistas"}
+						</span>
+					</div>
+
+					{/* Title */}
+					<h1 className="a2 hero-title" style={{ fontSize: "clamp(4rem,12vw,9rem)", fontWeight: 900, lineHeight: 0.9, letterSpacing: "-0.04em", marginBottom: 32, textTransform: "uppercase" }}>
+						{shop.name}
+					</h1>
+
+					{/* Tagline row */}
+					<div className="a3" style={{ display: "flex", alignItems: "flex-start", gap: 40, flexWrap: "wrap", marginBottom: 48 }}>
+						<div style={{ width: 1, height: 60, background: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
+						<p style={{ fontSize: "clamp(14px,2vw,17px)", fontWeight: 300, color: "#a8997a", maxWidth: 380, lineHeight: 1.7 }}>
+							{(() => { const msg = lang === "en" ? (shop.welcomeMessageEn || "Where precision meets passion. The finest cuts, the best experience.") : (translatedMsg || shop.welcomeMessage || shop.welcomeMessageEn || "Donde la precisión se une a la pasión. Los mejores cortes, la mejor experiencia."); return msg; })()}
+						</p>
+					</div>
+
+					{/* CTA row */}
+					<div className="a4" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+						{shop.googleReviewLink && (
+							<a href={shop.googleReviewLink} target="_blank" rel="noopener noreferrer" className="cta1"
+								style={{ padding: "14px 32px", background: "white", color: "#0a0a0a", fontWeight: 700, fontSize: 13, borderRadius: 8, letterSpacing: "-0.01em" }}>
+								★ {lang === "en" ? "Leave a Review" : "Dejar Reseña"}
+							</a>
+						)}
+						<button onClick={() => document.getElementById("team-sec")?.scrollIntoView({ behavior: "smooth" })}
+							className="cta2"
+							style={{ padding: "14px 32px", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", fontWeight: 500, fontSize: 13, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer" }}>
+							{lang === "en" ? "Meet the team" : "Conocer el equipo"} ↓
+						</button>
+					</div>
 				</div>
-			</div>
 
-			{/* CONTENT */}
-			<div style={{ maxWidth:680,margin:"0 auto",padding:"40px 20px 60px" }}>
+				{/* Scroll indicator */}
+				<div className="a5" style={{ position: "absolute", right: "clamp(20px,5vw,64px)", bottom: 80, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, animation: "float 2s ease infinite" }}>
+					<div style={{ width: 1, height: 48, background: "linear-gradient(to bottom,white,transparent)", opacity: 0.2 }} />
+				</div>
+			</section>
 
-				{/* FIND US */}
-				<div className="divider fi fi-1"><div /><span>{T.findUs}</span><div /></div>
-
-				{shop.address && (
-					<a href={`https://maps.google.com/?q=${encodeURIComponent(shop.address)}`} target="_blank" rel="noopener noreferrer" className="card">
-						<div className="icon-box" style={{ fontSize:18 }}>📍</div>
-						<div style={{ flex:1,minWidth:0 }}>
-							<p style={{ fontSize:10,color:"#475569",letterSpacing:"0.12em",marginBottom:3 }}>{T.address}</p>
-							<p style={{ fontSize:15,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{shop.address}</p>
+			{/* ── STATS BAR ── */}
+			<section style={{ padding: "0 clamp(20px,5vw,64px)", borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+				<div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", maxWidth: 1100, margin: "0 auto" }}>
+					{[
+						{ n: barbers?.length || 0, label: lang === "en" ? "Specialists" : "Especialistas" },
+						{ n: "7", label: lang === "en" ? "Days a week" : "Días a la semana" },
+						{ n: "★★★★★", label: lang === "en" ? "Rated" : "Calificado", isStars: true },
+						{ n: open ? "●" : "○", label: open ? (lang === "en" ? "Open now" : "Abierto ahora") : (lang === "en" ? "Currently closed" : "Cerrado ahora"), isDot: true, open },
+					].map((s, i) => (
+						<div key={i} className="stat-card" style={{ padding: "28px 20px", borderRight: i < 3 ? "1px solid rgba(255,255,255,0.06)" : "none", display: "flex", flexDirection: "column", gap: 6, background: "transparent" }}>
+							<p style={{ fontSize: s.isStars ? 18 : 32, fontWeight: s.isStars ? 400 : 800, letterSpacing: s.isStars ? "0.1em" : "-0.04em", color: s.isDot ? (s.open ? "#22c55e" : "#8a9bb5") : "white", lineHeight: 1 }}>{s.n}</p>
+							<p style={{ fontSize: 11, fontWeight: 500, color: "#8a9bb5", letterSpacing: 1, textTransform: "uppercase" }}>{s.label}</p>
 						</div>
-						<span style={{ fontSize:13,color:"#334155" }}>↗</span>
-					</a>
-				)}
+					))}
+				</div>
+			</section>
 
-				{shop.phone && (
-					<a href={`tel:${shop.phone}`} className="card">
-						<div className="icon-box" style={{ fontSize:18 }}>📞</div>
-						<div style={{ flex:1 }}>
-							<p style={{ fontSize:10,color:"#475569",letterSpacing:"0.12em",marginBottom:3 }}>{T.phone}</p>
-							<p style={{ fontSize:15,fontWeight:600 }}>{shop.phone}</p>
+			{/* ── TEAM ── */}
+			{barbers && barbers.length > 0 && (
+				<section id="team-sec" style={{ padding: "100px clamp(20px,5vw,64px)", position: "relative" }}>
+					<div style={{ maxWidth: 1100, margin: "0 auto" }}>
+						<div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 56, flexWrap: "wrap", gap: 16 }}>
+							<h2 style={{ fontSize: "clamp(2rem,5vw,4rem)", fontWeight: 800, letterSpacing: "-0.04em", textTransform: "uppercase" }}>
+								{lang === "en" ? "The Team" : "El Equipo"}
+							</h2>
+							<p style={{ fontSize: 12, color: "#8a9bb5", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>
+								{lang === "en" ? "Select a specialist" : "Selecciona un especialista"}
+							</p>
 						</div>
-						<span style={{ fontSize:13,color:"#334155" }}>↗</span>
-					</a>
-				)}
 
-				{shop.googleReviewLink && (
-					<a href={shop.googleReviewLink} target="_blank" rel="noopener noreferrer" className="card" style={{ borderColor:"rgba(251,191,36,0.12)" }}>
-						<div className="icon-box" style={{ background:"rgba(251,191,36,0.12)",fontSize:18 }}>⭐</div>
-						<div style={{ flex:1 }}>
-							<p style={{ fontSize:10,color:"#475569",letterSpacing:"0.12em",marginBottom:3 }}>{T.googleReviews}</p>
-							<p style={{ fontSize:15,fontWeight:600 }}>{T.leaveReview}</p>
-						</div>
-						<span style={{ fontSize:13,color:"#334155" }}>↗</span>
-					</a>
-				)}
+						<div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
+							{/* Photo panel */}
+							<div style={{ position: "sticky", top: 80 }}>
+								<div style={{ aspectRatio: "3/4", borderRadius: 16, overflow: "hidden", position: "relative", background: "#111" }}>
+									{currentBarber?.photoUrl && !imgError[activeBarber]
+										? <img
+												src={currentBarber.photoUrl}
+												alt={currentBarber.name}
+												onError={() => setImgError(p => ({ ...p, [activeBarber]: true }))}
+												style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block", imageRendering: "auto" }}
+												loading="eager"
+											/>
+										: <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#111,#1a1a1a)" }}>
+												<div style={{ textAlign: "center" }}>
+													<div style={{ fontSize: 64, marginBottom: 12, opacity: 0.15 }}>✂</div>
+													<p style={{ fontSize: 14, fontWeight: 600, color: "#6b7a8d", textTransform: "uppercase", letterSpacing: 2 }}>{currentBarber?.name}</p>
+												</div>
+											</div>
+									}
+									<div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,10,0.98) 0%,rgba(10,10,10,0.4) 35%,transparent 60%)" }} />
+									<div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px" }}>
+										<p style={{ fontSize: "clamp(1.6rem,3vw,2.4rem)", fontWeight: 800, letterSpacing: "-0.03em", textTransform: "uppercase", lineHeight: 1 }}>{currentBarber?.name}</p>
+										{currentBarber?.specialty && <p style={{ fontSize: 11, color: "#a8997a", letterSpacing: 2, textTransform: "uppercase", marginTop: 8, fontWeight: 500 }}>{currentBarber.specialty}</p>}
+									</div>
+									{/* Top-right number */}
+									<div style={{ position: "absolute", top: 16, right: 20, fontSize: 13, fontWeight: 700, color: "#7a8ba0", letterSpacing: 1 }}>
+										{String(activeBarber + 1).padStart(2, "0")} / {String(barbers.length).padStart(2, "0")}
+									</div>
+								</div>
+							</div>
 
-				{/* HOURS */}
-				{/* HOURS */}
-				{Object.keys(weeklyHours).length > 0 && (
-					<>
-						<div className="divider fi fi-2"><div /><span>{T.hours}</span><div /></div>
-						{/* Today highlight */}
-						<div style={{ display:"flex",alignItems:"center",gap:14,padding:"20px",borderRadius:16,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",marginBottom:10 }}>
-							<div className="icon-box" style={{ fontSize:18 }}>🕐</div>
-							<div style={{ flex:1 }}>
-								<p style={{ fontSize:10,color:"#475569",letterSpacing:"0.12em",marginBottom:4 }}>{DAY[todayIdx].toUpperCase()}</p>
-								{todayHours.closed ? (
-									<p style={{ fontSize:15,fontWeight:700,color:"#475569" }}>{T.closed}</p>
-								) : (
-									<>
-										<p style={{ fontSize:15,fontWeight:700,marginBottom:4 }}>
-											{fmt12(todayHours.open)} – {fmt12(todayHours.close)}
-										</p>
-										<div style={{ display:"inline-flex",alignItems:"center",gap:5,background:isOpenNow?"rgba(16,185,129,0.12)":"rgba(71,85,105,0.2)",border:`1px solid ${isOpenNow?"rgba(16,185,129,0.3)":"rgba(71,85,105,0.3)"}`,borderRadius:20,padding:"3px 10px" }}>
-											<div style={{ width:5,height:5,borderRadius:"50%",background:isOpenNow?"#10b981":"#475569",animation:isOpenNow?"pulse 1.5s ease-in-out infinite":"none" }} />
-											<span style={{ fontSize:10,fontWeight:700,color:isOpenNow?"#10b981":"#475569" }}>{isOpenNow ? T.openNow : T.closedNow}</span>
+							{/* List panel */}
+							<div style={{ display: "flex", flexDirection: "column" }}>
+								{barbers.map((b: any, i: number) => (
+									<button key={b.id} type="button" className="barber-tab"
+										onClick={() => setActiveBarber(i)}
+										style={{ display: "flex", alignItems: "center", gap: 16, padding: "20px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: i === activeBarber ? "rgba(255,255,255,0.04)" : "transparent" }}>
+										{/* Index number */}
+										<span style={{ fontSize: 11, fontWeight: 700, color: i === activeBarber ? "white" : "#6b7a8d", letterSpacing: 1, minWidth: 24 }}>
+											{String(i + 1).padStart(2, "0")}
+										</span>
+										{/* Photo */}
+										<div style={{ width: 48, height: 48, borderRadius: 10, overflow: "hidden", flexShrink: 0, border: i === activeBarber ? "2px solid white" : "2px solid rgba(255,255,255,0.1)" }}>
+											{b.photoUrl && !imgError[i]
+												? <img src={b.photoUrl} onError={() => setImgError(p => ({ ...p, [i]: true }))} loading="eager" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", imageRendering: "auto" }} alt={b.name} />
+												: <div style={{ width: "100%", height: "100%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: "#6b7a8d" }}>{b.name[0]}</div>
+											}
 										</div>
-									</>
+										{/* Info */}
+										<div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+											<p className="tab-name" style={{ fontWeight: 700, fontSize: 15, color: i === activeBarber ? "white" : "#a8997a", textTransform: "uppercase", letterSpacing: "-0.02em", lineHeight: 1, marginBottom: 4 }}>{b.name}</p>
+											{b.specialty && <p style={{ fontSize: 10, fontWeight: 500, color: "#7a8ba0", letterSpacing: 2, textTransform: "uppercase" }}>{b.specialty}</p>}
+										</div>
+										{/* Arrow */}
+										<span style={{ fontSize: 14, color: i === activeBarber ? "white" : "rgba(255,255,255,0.2)", transition: "all 0.3s", transform: i === activeBarber ? "translateX(4px)" : "none" }}>→</span>
+									</button>
+								))}
+							</div>
+						</div>
+					</div>
+				</section>
+			)}
+
+			{/* ── HOURS + MAP ── */}
+			<section style={{ padding: "80px clamp(20px,5vw,64px) 100px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+				<div style={{ maxWidth: 1100, margin: "0 auto" }}>
+					<div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48 }}>
+
+						{/* Hours */}
+						{wh && (
+							<div>
+								<div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 36 }}>
+									<h2 style={{ fontSize: "clamp(1.8rem,4vw,3rem)", fontWeight: 800, letterSpacing: "-0.04em", textTransform: "uppercase" }}>
+										{lang === "en" ? "Hours" : "Horarios"}
+									</h2>
+									<span style={{ fontSize: 11, fontWeight: 600, color: open ? "#22c55e" : "#7a8ba0", letterSpacing: 1, textTransform: "uppercase" }}>
+										{open ? (lang === "en" ? "● Open now" : "● Abierto") : (lang === "en" ? "○ Closed" : "○ Cerrado")}
+									</span>
+								</div>
+								<div>
+									{(lang === "en" ? DAYS_EN : DAYS_ES).map((day, i) => {
+										const h = wh[i]; const isToday = i === today;
+										return (
+											<div key={i} className="day-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 12px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: isToday ? "rgba(255,255,255,0.03)" : "transparent" }}>
+												<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+													{isToday && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#22c55e", flexShrink: 0 }} />}
+													<span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isToday ? "white" : "#a8997a", marginLeft: isToday ? 0 : 14 }}>{day}</span>
+												</div>
+												<span style={{ fontSize: 12, fontWeight: isToday ? 600 : 400, color: h?.closed ? "rgba(255,255,255,0.18)" : isToday ? "white" : "#a8997a" }}>
+													{h?.closed ? (lang === "en" ? "Closed" : "Cerrado") : `${t12(h?.open || "09:00")} – ${t12(h?.close || "18:00")}`}
+												</span>
+											</div>
+										);
+									})}
+								</div>
+								{todayH && !todayH.closed && (
+									<div style={{ marginTop: 20, padding: "14px 16px", background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 10 }}>
+										<p style={{ fontSize: 12, color: "#22c55e", fontWeight: 600 }}>
+											{lang === "en" ? `Today: ${t12(todayH.open)} – ${t12(todayH.close)}` : `Hoy: ${t12(todayH.open)} – ${t12(todayH.close)}`}
+										</p>
+									</div>
 								)}
 							</div>
-						</div>
-						{/* Full week */}
-						<div style={{ borderRadius:16,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",overflow:"hidden" }}>
-							{[0,1,2,3,4,5,6].map(d => {
-								const h: DayHours = weeklyHours[d] ?? { open:"09:00",close:"19:00",closed:false };
-								const isToday = d === todayIdx;
-								return (
-									<div key={d} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 18px",borderBottom:d<6?"1px solid rgba(255,255,255,0.04)":"none",background:isToday?"rgba(249,115,22,0.06)":"transparent" }}>
-										<span style={{ fontSize:13,fontWeight:isToday?700:400,color:isToday?"#fb923c":"#94a3b8",width:90 }}>{DAY[d]}</span>
-										<span style={{ fontSize:13,color:h.closed?"#475569":"white",fontWeight:isToday?600:400 }}>
-											{h.closed ? T.closed : `${fmt12(h.open)} – ${fmt12(h.close)}`}
-										</span>
-									</div>
-								);
-							})}
-						</div>
-					</>
-				)}
+						)}
 
-				{/* TODAY's BARBERS */}
-				{todayBarbers.length > 0 && (
-					<div style={{ padding:"20px",borderRadius:16,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)" }}>
-						<p style={{ fontSize:10,color:"#475569",letterSpacing:"0.12em",marginBottom:8 }}>TODAY</p>
-						<p style={{ fontSize:15,fontWeight:700,marginBottom:4 }}>
-							{todayBarbers.length} {todayBarbers.length !== 1 ? T.barbers : T.barber}
-						</p>
-						<p style={{ fontSize:13,color:"#64748b" }}>{todayBarbers.map(b => b.name).join(", ")}</p>
-					</div>
-				)}
-
-				{/* TEAM */}
-				{allBarbers.length > 0 && (
-					<>
-						<div className="divider fi fi-3"><div /><span>{T.team}</span><div /></div>
-						<div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12 }}>
-							{allBarbers.map(barber => {
-								const workDays = JSON.parse(barber.workDays ?? "[0,1,2,3,4,5,6]") as number[];
-								const availToday = workDays.includes(todayIdx) && !barber.onVacation;
-								return (
-									<div key={barber.id} className="barber-card">
-										{/* Photo */}
-										{barber.photoUrl ? (
-											<img src={barber.photoUrl} alt={barber.name} style={{ width:68,height:68,borderRadius:"50%",objectFit:"cover",margin:"0 auto 12px",border:"2px solid rgba(249,115,22,0.3)",display:"block" }} />
-										) : (
-											<div style={{ width:68,height:68,borderRadius:"50%",background:"linear-gradient(135deg,rgba(249,115,22,0.2),rgba(234,88,12,0.15))",border:"2px solid rgba(249,115,22,0.2)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:26 }}>
-												✂️
-											</div>
-										)}
-										<p style={{ fontSize:14,fontWeight:700,marginBottom:4 }}>{barber.name}</p>
-										{barber.specialty && <p style={{ fontSize:11,color:"#64748b",marginBottom:10 }}>{barber.specialty}</p>}
-										<div style={{ display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:700,background:availToday?"rgba(16,185,129,0.12)":"rgba(71,85,105,0.2)",color:availToday?"#10b981":"#475569",border:`1px solid ${availToday?"rgba(16,185,129,0.3)":"rgba(71,85,105,0.3)"}` }}>
-											<div style={{ width:4,height:4,borderRadius:"50%",background:availToday?"#10b981":"#475569" }} />
-											{availToday ? T.available : T.off}
-										</div>
-										{/* Work days */}
-										<div style={{ display:"flex",gap:3,justifyContent:"center",marginTop:10,flexWrap:"wrap" }}>
-											{DAY.map((d,i) => (
-												<span key={i} style={{ width:22,height:22,borderRadius:6,fontSize:8,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center",background:workDays.includes(i)?"rgba(249,115,22,0.2)":"rgba(255,255,255,0.03)",color:workDays.includes(i)?"#f97316":"#334155",border:`1px solid ${workDays.includes(i)?"rgba(249,115,22,0.3)":"transparent"}` }}>
-													{d[0]}
-												</span>
-											))}
-										</div>
+						{/* Location */}
+						<div>
+							<h2 style={{ fontSize: "clamp(1.8rem,4vw,3rem)", fontWeight: 800, letterSpacing: "-0.04em", textTransform: "uppercase", marginBottom: 36 }}>
+								{lang === "en" ? "Location" : "Ubicación"}
+							</h2>
+							{shop.address && (
+								<>
+									<p style={{ fontSize: 15, fontWeight: 400, color: "#a8997a", lineHeight: 1.8, marginBottom: 8 }}>{shop.address}</p>
+									{shop.phone && <p style={{ fontSize: 15, fontWeight: 600, color: "white", marginBottom: 24 }}>{shop.phone}</p>}
+									<div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 24 }}>
+										<iframe src={`https://maps.google.com/maps?q=${encodeURIComponent(shop.address)}&output=embed&z=15`}
+											width="100%" height="220" style={{ border: "none", display: "block", filter: "grayscale(100%) contrast(90%) brightness(0.8)" }} loading="lazy" title="map" />
 									</div>
-								);
-							})}
-						</div>
-					</>
-				)}
-
-				{/* APPOINTMENT BOOKING MODAL */}
-				{showApptForm && (
-					<div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center" }} onClick={() => setShowApptForm(false)}>
-						<div style={{ background:"#0f0f14",borderRadius:"24px 24px 0 0",padding:"32px 24px 48px",width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto" }} onClick={e => e.stopPropagation()}>
-							<div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24 }}>
-								<h2 style={{ fontSize:20,fontWeight:800,color:"white",margin:0 }}>📅 {T.bookAppt}</h2>
-								<button type="button" onClick={() => setShowApptForm(false)} style={{ background:"rgba(255,255,255,0.08)",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",color:"white",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center" }}>✕</button>
-							</div>
-
-							{apptStep === 4 ? (
-								<div style={{ textAlign:"center",padding:"20px 0" }}>
-									<div style={{ fontSize:64,marginBottom:16 }}>✅</div>
-									<h3 style={{ color:"white",fontSize:22,fontWeight:800,marginBottom:8 }}>{T.apptConfirmed}</h3>
-									<p style={{ color:"#64748b",fontSize:14,marginBottom:24 }}>{T.apptConfirmedMsg}</p>
-									<button type="button" onClick={() => { setShowApptForm(false); setApptStep(1); setApptBarber(0); setApptDate(""); setApptTime(""); setApptName(""); setApptPhone(""); }} style={{ padding:"14px 40px",background:"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer" }}>OK</button>
-								</div>
-							) : apptStep === 1 ? (
-								<div style={{ display:"flex",flexDirection:"column",gap:20 }}>
-									<div>
-										<p style={{ color:"#94a3b8",fontSize:13,marginBottom:10,fontWeight:600 }}>{T.selectBarber}</p>
-										<div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
-											{(allBarbers ?? []).map(b => (
-												<button key={b.id} type="button" onClick={() => setApptBarber(b.id)} style={{ padding:"10px 18px",borderRadius:12,border:`2px solid ${apptBarber===b.id?"#6366f1":"rgba(255,255,255,0.1)"}`,background:apptBarber===b.id?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.04)",color:apptBarber===b.id?"#a5b4fc":"#94a3b8",fontWeight:600,fontSize:14,cursor:"pointer" }}>
-													{b.name}
-												</button>
-											))}
-										</div>
-									</div>
-									<div>
-										<p style={{ color:"#94a3b8",fontSize:13,marginBottom:10,fontWeight:600 }}>{T.selectDate}</p>
-										<input type="date" value={apptDate} min={new Date().toISOString().split("T")[0]} onChange={e => setApptDate(e.target.value)} style={{ width:"100%",padding:"14px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"white",fontSize:15,boxSizing:"border-box" }} />
-									</div>
-									<button type="button" disabled={!apptBarber || !apptDate} onClick={() => setApptStep(2)} style={{ padding:"16px",background:(!apptBarber||!apptDate)?"rgba(99,102,241,0.3)":"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:(!apptBarber||!apptDate)?"not-allowed":"pointer",opacity:(!apptBarber||!apptDate)?0.5:1 }}>{T.next} →</button>
-								</div>
-							) : apptStep === 2 ? (
-								<div style={{ display:"flex",flexDirection:"column",gap:16 }}>
-									<p style={{ color:"#94a3b8",fontSize:13,fontWeight:600 }}>{T.selectTime}</p>
-									{availableSlots?.slots && availableSlots.slots.length > 0 ? (
-										<div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8 }}>
-											{availableSlots.slots.map(s => {
-												const [h,m] = s.split(":").map(Number);
-												const fmt = `${h%12||12}:${m.toString().padStart(2,"0")} ${h>=12?"PM":"AM"}`;
-												return <button key={s} type="button" onClick={() => setApptTime(s)} style={{ padding:"12px 8px",borderRadius:10,border:`2px solid ${apptTime===s?"#6366f1":"rgba(255,255,255,0.08)"}`,background:apptTime===s?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.03)",color:apptTime===s?"#a5b4fc":"#94a3b8",fontWeight:600,fontSize:13,cursor:"pointer" }}>{fmt}</button>;
-											})}
-										</div>
-									) : (
-										<p style={{ color:"#475569",textAlign:"center",padding:"20px 0" }}>{lang==="es"?"No hay horarios disponibles para este día":"No available slots for this day"}</p>
-									)}
-									<div style={{ display:"flex",gap:10 }}>
-										<button type="button" onClick={() => setApptStep(1)} style={{ flex:1,padding:"14px",background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"none",borderRadius:12,fontSize:14,cursor:"pointer" }}>← {T.back}</button>
-										<button type="button" disabled={!apptTime} onClick={() => setApptStep(3)} style={{ flex:2,padding:"14px",background:!apptTime?"rgba(99,102,241,0.3)":"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:!apptTime?"not-allowed":"pointer",opacity:!apptTime?0.5:1 }}>{T.next} →</button>
-									</div>
-								</div>
-							) : (
-								<div style={{ display:"flex",flexDirection:"column",gap:14 }}>
-									<input type="text" placeholder={T.yourName} value={apptName} onChange={e => setApptName(e.target.value)} style={{ padding:"14px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"white",fontSize:15,outline:"none" }} />
-									<input type="tel" placeholder={T.yourPhone} value={apptPhone} onChange={e => setApptPhone(e.target.value)} style={{ padding:"14px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"white",fontSize:15,outline:"none" }} />
-									<div style={{ display:"flex",gap:10 }}>
-										<button type="button" onClick={() => setApptStep(2)} style={{ flex:1,padding:"14px",background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"none",borderRadius:12,fontSize:14,cursor:"pointer" }}>← {T.back}</button>
-										<button type="button" disabled={!apptName.trim()||!apptPhone.trim()||apptLoading} onClick={async () => {
-											try { setApptLoading(true); await createAppointment({ data: { shopId: id, barberId: apptBarber, clientName: apptName, clientPhone: apptPhone, date: apptDate, time: apptTime } }); setApptStep(4); } catch {} finally { setApptLoading(false); }
-										}} style={{ flex:2,padding:"14px",background:(!apptName.trim()||!apptPhone.trim())||apptLoading?"rgba(99,102,241,0.3)":"linear-gradient(135deg,#6366f1,#4f46e5)",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",opacity:(!apptName.trim()||!apptPhone.trim())||apptLoading?0.5:1 }}>
-											{apptLoading ? "..." : T.confirmAppt}
-										</button>
-									</div>
-								</div>
+								</>
+							)}
+							{shop.googleReviewLink && (
+								<a href={shop.googleReviewLink} target="_blank" rel="noopener noreferrer"
+									style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textDecoration: "none", transition: "all 0.3s ease", background: "rgba(255,255,255,0.03)" }}
+									className="cta2">
+									★ {lang === "en" ? "Google Reviews" : "Reseñas Google"}
+								</a>
 							)}
 						</div>
 					</div>
-				)}
-
-				{/* FOOTER */}
-				<div style={{ borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:28,textAlign:"center",marginTop:48 }}>
-					<div style={{ display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginBottom:6 }}>
-						<div style={{ width:20,height:20,borderRadius:6,background:"linear-gradient(135deg,#f97316,#ea580c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10 }}>✂️</div>
-						<span style={{ fontSize:12,color:"#64748b" }}>{T.poweredBy} <span style={{ color:"#f97316",fontWeight:700 }}>Goolinext</span></span>
-					</div>
-					<p style={{ fontSize:11,color:"#334155" }}>{T.poweredSub}</p>
 				</div>
-			</div>
+			</section>
+
+			{/* ── FOOTER ── */}
+			<footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "32px clamp(20px,5vw,64px)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+					{logo
+						? <img src={logo} style={{ width: 24, height: 24, borderRadius: 5, objectFit: "cover", opacity: 0.5 }} alt="" />
+						: <div style={{ width: 24, height: 24, borderRadius: 5, background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#8a9bb5" }}>{shop.name[0]}</div>
+					}
+					<span style={{ fontSize: 11, fontWeight: 600, color: "#6b7a8d", letterSpacing: 2, textTransform: "uppercase" }}>{shop.name}</span>
+				</div>
+				<p style={{ fontSize: 10, color: "#4a5568", letterSpacing: 2, textTransform: "uppercase" }}>Powered by Goolinext</p>
+			</footer>
 		</div>
 	);
 }

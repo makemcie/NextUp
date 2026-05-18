@@ -11,10 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as OptInRouteImport } from './routes/opt-in'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RegisterShopIdRouteImport } from './routes/register/$shopId'
 import { Route as QueueShopIdRouteImport } from './routes/queue/$shopId'
+import { Route as CancelTokenRouteImport } from './routes/cancel/$token'
 import { Route as BizShopIdRouteImport } from './routes/biz/$shopId'
+import { Route as AppointmentShopIdRouteImport } from './routes/appointment/$shopId'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -24,6 +28,16 @@ const TermsRoute = TermsRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OptInRoute = OptInRouteImport.update({
+  id: '/opt-in',
+  path: '/opt-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -41,34 +55,56 @@ const QueueShopIdRoute = QueueShopIdRouteImport.update({
   path: '/queue/$shopId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CancelTokenRoute = CancelTokenRouteImport.update({
+  id: '/cancel/$token',
+  path: '/cancel/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BizShopIdRoute = BizShopIdRouteImport.update({
   id: '/biz/$shopId',
   path: '/biz/$shopId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppointmentShopIdRoute = AppointmentShopIdRouteImport.update({
+  id: '/appointment/$shopId',
+  path: '/appointment/$shopId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/opt-in': typeof OptInRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/appointment/$shopId': typeof AppointmentShopIdRoute
   '/biz/$shopId': typeof BizShopIdRoute
+  '/cancel/$token': typeof CancelTokenRoute
   '/queue/$shopId': typeof QueueShopIdRoute
   '/register/$shopId': typeof RegisterShopIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/opt-in': typeof OptInRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/appointment/$shopId': typeof AppointmentShopIdRoute
   '/biz/$shopId': typeof BizShopIdRoute
+  '/cancel/$token': typeof CancelTokenRoute
   '/queue/$shopId': typeof QueueShopIdRoute
   '/register/$shopId': typeof RegisterShopIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/opt-in': typeof OptInRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/appointment/$shopId': typeof AppointmentShopIdRoute
   '/biz/$shopId': typeof BizShopIdRoute
+  '/cancel/$token': typeof CancelTokenRoute
   '/queue/$shopId': typeof QueueShopIdRoute
   '/register/$shopId': typeof RegisterShopIdRoute
 }
@@ -76,34 +112,50 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
+    | '/opt-in'
     | '/privacy'
     | '/terms'
+    | '/appointment/$shopId'
     | '/biz/$shopId'
+    | '/cancel/$token'
     | '/queue/$shopId'
     | '/register/$shopId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
+    | '/opt-in'
     | '/privacy'
     | '/terms'
+    | '/appointment/$shopId'
     | '/biz/$shopId'
+    | '/cancel/$token'
     | '/queue/$shopId'
     | '/register/$shopId'
   id:
     | '__root__'
     | '/'
+    | '/admin'
+    | '/opt-in'
     | '/privacy'
     | '/terms'
+    | '/appointment/$shopId'
     | '/biz/$shopId'
+    | '/cancel/$token'
     | '/queue/$shopId'
     | '/register/$shopId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  OptInRoute: typeof OptInRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  AppointmentShopIdRoute: typeof AppointmentShopIdRoute
   BizShopIdRoute: typeof BizShopIdRoute
+  CancelTokenRoute: typeof CancelTokenRoute
   QueueShopIdRoute: typeof QueueShopIdRoute
   RegisterShopIdRoute: typeof RegisterShopIdRoute
 }
@@ -122,6 +174,20 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/opt-in': {
+      id: '/opt-in'
+      path: '/opt-in'
+      fullPath: '/opt-in'
+      preLoaderRoute: typeof OptInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -145,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QueueShopIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cancel/$token': {
+      id: '/cancel/$token'
+      path: '/cancel/$token'
+      fullPath: '/cancel/$token'
+      preLoaderRoute: typeof CancelTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/biz/$shopId': {
       id: '/biz/$shopId'
       path: '/biz/$shopId'
@@ -152,14 +225,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BizShopIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/appointment/$shopId': {
+      id: '/appointment/$shopId'
+      path: '/appointment/$shopId'
+      fullPath: '/appointment/$shopId'
+      preLoaderRoute: typeof AppointmentShopIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  OptInRoute: OptInRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  AppointmentShopIdRoute: AppointmentShopIdRoute,
   BizShopIdRoute: BizShopIdRoute,
+  CancelTokenRoute: CancelTokenRoute,
   QueueShopIdRoute: QueueShopIdRoute,
   RegisterShopIdRoute: RegisterShopIdRoute,
 }

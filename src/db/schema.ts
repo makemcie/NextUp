@@ -17,6 +17,7 @@ export const users = sqliteTable("users", {
 	email: text("email").notNull().unique(),
 	passwordHash: text("password_hash").notNull(),
 	phone: text("phone"),
+	isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
@@ -42,8 +43,12 @@ export const shops = sqliteTable("shops", {
 	address: text("address"),
 	phone: text("phone"),
 	googleReviewLink: text("google_review_link"),
-	welcomeMessage: text("welcome_message").default(
+	whatsappNumber: text("whatsapp_number"),
+		welcomeMessage: text("welcome_message").default(
 		"¡Gracias por visitarnos! Por favor toma asiento, serás atendido en breve.",
+	),
+	welcomeMessageEn: text("welcome_message_en").default(
+		"Thank you for visiting! Please have a seat, you will be attended shortly.",
 	),
 	followUpMessage: text("follow_up_message").default(
 		"¡Gracias por visitarnos hoy! Nos encantaría saber tu opinión. ¿Podrías dejarnos una reseña en Google?",
@@ -65,6 +70,10 @@ export const shops = sqliteTable("shops", {
 	stripeSubscriptionId: text("stripe_subscription_id"),
 	subscriptionStatus: text("subscription_status").default("trial"), // trial, active, past_due, canceled
 	subscriptionEndsAt: integer("subscription_ends_at", { mode: "timestamp" }),
+	stripeAccountId: text("stripe_account_id"),
+	depositAmount: integer("deposit_amount").notNull().default(1059),
+	appointmentsPublic: integer("appointments_public", { mode: "boolean" }).notNull().default(true),
+	timezone: text("timezone").notNull().default("America/New_York"),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
@@ -84,6 +93,8 @@ export const barbers = sqliteTable("barbers", {
 	workDays: text("work_days").notNull().default("[0,1,2,3,4,5,6]"),
 	onVacation: integer("on_vacation", { mode: "boolean" }).notNull().default(false),
 	manualOverrideDate: text("manual_override_date"),
+	stripeAccountId: text("stripe_account_id"),
+	stripePayoutsEnabled: integer("stripe_payouts_enabled", { mode: "boolean" }).notNull().default(false),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
@@ -117,6 +128,7 @@ export const visits = sqliteTable("visits", {
 	welcomeSent: integer("welcome_sent", { mode: "boolean" }).notNull().default(false),
 	followUpSent: integer("follow_up_sent", { mode: "boolean" }).notNull().default(false),
 	followUpScheduledAt: integer("follow_up_scheduled_at", { mode: "timestamp" }),
+	amountPaid: real("amount_paid"),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
@@ -134,10 +146,16 @@ export const appointments = sqliteTable("appointments", {
 	appointmentTime: text("appointment_time").notNull(), // HH:MM
 	status: text("status").notNull().default("scheduled"), // scheduled, completed, cancelled, no_show
 	notes: text("notes"),
+	groupSize: integer("group_size").notNull().default(1),
 	visitId: integer("visit_id").references(() => visits.id),
 	reminderSent: integer("reminder_sent", { mode: "boolean" }).notNull().default(false),
 	cancelRequested: integer("cancel_requested", { mode: "boolean" }).notNull().default(false),
 	cancelRequestedBy: integer("cancel_requested_by"),
+	depositPaid: integer("deposit_paid", { mode: "boolean" }).notNull().default(false),
+	depositAmount: integer("deposit_amount").notNull().default(0),
+	stripePaymentIntentId: text("stripe_payment_intent_id"),
+	cancelToken: text("cancel_token"),
+	clientUserId: integer("client_user_id").references(() => clientAccounts.id),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
@@ -150,6 +168,39 @@ export const passwordResetTokens = sqliteTable("password_reset_tokens", {
 	token: text("token").notNull().unique(),
 	expiresAt: integer("expires_at").notNull(),
 	used: integer("used", { mode: "boolean" }).notNull().default(false),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+});
+
+// Client accounts (for appointment booking)
+export const clientAccounts = sqliteTable("client_accounts", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	name: text("name").notNull(),
+	phone: text("phone").notNull().unique(),
+	email: text("email"),
+	passwordHash: text("password_hash").notNull(),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+});
+
+// Client sessions
+export const clientRetention = sqliteTable("client_retention", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	shopId: integer("shop_id").notNull().references(() => shops.id),
+	clientId: integer("client_id").notNull().references(() => clients.id),
+	callStatus: text("call_status").notNull().default("pending"), // pending | answered | no_answer
+	note: text("note"),
+	updatedAt: integer("updated_at"),
+});
+
+export const clientSessions = sqliteTable("client_sessions", {
+	id: text("id").primaryKey(),
+	clientAccountId: integer("client_account_id")
+		.notNull()
+		.references(() => clientAccounts.id),
+	expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
