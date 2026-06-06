@@ -92,6 +92,30 @@ function RegisterPage() {
 		groupResults?: Array<{ name: string; position: number; visitId: number }>;
 	} | null>(null);
 
+	// Prevenir que usuario abandone la página después de registrarse
+	useEffect(() => {
+		if (!result) return;
+
+		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+			const position = result.queuePosition || 1;
+			const message = lang === "es" 
+				? `¡No te vayas! Estás en la posición #${position}. Por favor, quédate para monitorear tu turno.`
+				: `Don't leave! You're #${position} in the queue. Please stay to monitor your position.`;
+			
+			e.preventDefault();
+			e.returnValue = message;
+			return message;
+		};
+
+		// Agregar el event listener
+		window.addEventListener("beforeunload", handleBeforeUnload);
+
+		// Cleanup
+		return () => {
+			window.removeEventListener("beforeunload", handleBeforeUnload);
+		};
+	}, [result, lang]);
+
 	const mutation = useMutation({
 		mutationFn: async () => {
 			const allNames = [name, ...groupNames].slice(0, groupSize);

@@ -20,6 +20,13 @@ export async function sendSMSViaSent(to: string, code: string): Promise<boolean>
 			return false;
 		}
 
+		// Normalizar teléfono: agregar +1 si no tiene +
+		let phoneNumber = to.trim();
+		if (!phoneNumber.startsWith("+")) {
+			const digits = phoneNumber.replace(/[^0-9]/g, "");
+			phoneNumber = "+1" + digits;
+		}
+
 		// Template ID de Sent
 		const templateId = "0d309e5f-95f3-4634-b7c9-d4c8be382e24";
 
