@@ -89,7 +89,7 @@ function NotificationBanner({ notification, onComplete }: { notification: Notifi
 	);
 }
 
-function QRComponent({ shopId }: { shopId: number }) {
+function QRComponent({ shopId, showQr }: { shopId: number; showQr: boolean }) {
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
@@ -97,6 +97,8 @@ function QRComponent({ shopId }: { shopId: number }) {
 	}, []);
 
 	if (!mounted) return null;
+
+	if (!showQr) return null;
 
 	const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
 		`${window.location.origin}/register/${shopId}`
@@ -258,7 +260,7 @@ function QueueDisplayPage() {
 				)}
 			</div>
 
-			<QRComponent shopId={shopIdNum} />
+			<QRComponent shopId={shopIdNum} showQr={shop?.showQr ?? true} />
 
 			<div className="fixed bottom-0 inset-x-0 border-t border-gray-800/50 bg-gray-950/80 backdrop-blur-xl py-3">
 				<p className="text-center text-xs text-gray-600">

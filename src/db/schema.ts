@@ -77,6 +77,7 @@ export const shops = sqliteTable("shops", {
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
+	showQr: integer("show_qr", { mode: "boolean" }).notNull().default(true),
 });
 
 // Barbers/Stylists
