@@ -3394,6 +3394,7 @@ function SettingsView({
 			if (fullShop.name) setShopName(fullShop.name);
 			if (fullShop.address) setShopAddress(fullShop.address);
 			if (fullShop.phone) setShopPhone(fullShop.phone);
+			if (fullShop.showQr !== undefined) setShowQr(fullShop.showQr);
 		}
 	}, [fullShop]);
 
@@ -3413,6 +3414,7 @@ function SettingsView({
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["myShop"] });
+			queryClient.invalidateQueries({ queryKey: ["shopPublic", shop.id] });
 		},
 	});
 
