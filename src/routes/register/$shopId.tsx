@@ -754,7 +754,7 @@ function QueueConfirmation({
 			{/* View Live Queue Button */}
 			<button
 				type="button"
-				onClick={() => window.open(`/queue/${shopId}`, '_blank')}
+				onClick={() => window.open(`/register/${shopId}`, '_blank')}
 				className="w-full max-w-sm py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-2xl shadow-lg shadow-blue-600/30 transition-all active:scale-95"
 			>
 				{lang === "es" ? "📱 Ver Cola en Tiempo Real" : "📱 View Live Queue"}
