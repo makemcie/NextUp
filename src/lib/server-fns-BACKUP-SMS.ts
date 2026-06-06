@@ -1504,11 +1504,8 @@ export const callNextClient = createServerFn({ method: "POST" })
 
 		// Send SMS to client that their turn is ready
 		if (client[0]?.phone) {
-		const message = `It's your turn! 🎉
-Please head to the chair with ${barberInfo[0]?.name ?? "your barber"}.
-We're waiting for you! 💈`;
-		sendSmsSafe(client[0].phone, message).catch(() => {});
-	}
+			sendSmsSafe(client[0].phone, `${shopInfo[0]?.name ?? "Barbershop"}: It's your turn! Come to the chair now. Reply STOP to opt out.`).catch(() => {});
+		}
 
 		return { called: true, clientName: client[0]?.name ?? "" };
 	});
@@ -1536,38 +1533,6 @@ export const completeClient = createServerFn({ method: "POST" })
 			.update(visits)
 			.set({ status: "completed", followUpScheduledAt: followUpTime, amountPaid: data.amountPaid })
 			.where(eq(visits.id, data.visitId));
-
-		// Send thank you SMS with Google review link
-		if (shop[0]?.smsEnabled) {
-			const visit = await (await db())
-				.select()
-				.from(visits)
-				.where(eq(visits.id, data.visitId))
-				.limit(1)
-				.all();
-
-			if (visit[0]) {
-				const client = await (await db())
-					.select()
-					.from(clients)
-					.where(eq(clients.id, visit[0].clientId))
-					.limit(1)
-					.all();
-
-				if (client[0]?.phone) {
-					// Create Google Maps review URL
-					const googleReviewUrl = `https://www.google.com/maps/search/${encodeURIComponent(shop[0].name)}`;
-
-					const message = `Thanks for visiting ${shop[0].name}! 😊
-⭐ Leave us a review on Google!
-${googleReviewUrl}
-
-Reply STOP to opt out.`;
-
-					sendSmsSafe(client[0].phone, message).catch(() => {});
-				}
-			}
-		}
 
 		await broadcast({ type: "queue_updated", shopId: data.shopId });
 		return { success: true };
@@ -1938,38 +1903,6 @@ export const barberCompleteClient = createServerFn({ method: "POST" })
 			.update(visits)
 			.set({ status: "completed", followUpScheduledAt: followUpTime, amountPaid: data.amountPaid })
 			.where(eq(visits.id, data.visitId));
-
-		// Send thank you SMS with Google review link
-		if (shop[0]?.smsEnabled) {
-			const visit = await (await db())
-				.select()
-				.from(visits)
-				.where(eq(visits.id, data.visitId))
-				.limit(1)
-				.all();
-
-			if (visit[0]) {
-				const client = await (await db())
-					.select()
-					.from(clients)
-					.where(eq(clients.id, visit[0].clientId))
-					.limit(1)
-					.all();
-
-				if (client[0]?.phone) {
-					// Create Google Maps review URL
-					const googleReviewUrl = `https://www.google.com/maps/search/${encodeURIComponent(shop[0].name)}`;
-
-					const message = `Thanks for visiting ${shop[0].name}! 😊
-⭐ Leave us a review on Google!
-${googleReviewUrl}
-
-Reply STOP to opt out.`;
-
-					sendSmsSafe(client[0].phone, message).catch(() => {});
-				}
-			}
-		}
 
 		await broadcast({ type: "queue_updated", shopId: barber[0].shopId });
 		return { success: true };
