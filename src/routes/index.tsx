@@ -3376,6 +3376,7 @@ function SettingsView({
 		fullShop?.reminderDays ?? 30,
 	);
 	const [logoUrl, setLogoUrl] = useState(fullShop?.logoUrl ?? "");
+	const [showQr, setShowQr] = useState(fullShop?.showQr ?? true);
 	const [ownerPhone, setOwnerPhone] = useState("");
 
 	// Load owner phone
@@ -3400,7 +3401,23 @@ function SettingsView({
 		mutationFn: () => updateOwnerPhone({ data: { phone: ownerPhone } }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ownerPhone"] }),
 	});
-	const defaultHours = {
+
+	const qrToggleMutation = useMutation({
+		mutationFn: async (newValue: boolean) => {
+			await updateShop({
+				data: {
+					id: shop.id,
+					showQr: newValue,
+				},
+			});
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["myShop"] });
+		},
+	});
+
+
+		const defaultHours = {
 		0: { open: "09:00", close: "18:00", closed: true },
 		1: { open: "09:00", close: "19:00", closed: false },
 		2: { open: "09:00", close: "19:00", closed: false },
@@ -3649,7 +3666,40 @@ function SettingsView({
 				/>
 			</div>
 
-						<button
+						
+
+			{/* QR Code Settings */}
+			<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-3">
+				<h3 className="text-base font-semibold text-white flex items-center gap-2">
+					<QrCode className="w-4 h-4 text-amber-400" />
+					{lang === "es" ? "Código QR de la cola" : "Queue QR Code"}
+				</h3>
+				<p className="text-xs text-gray-500">
+					{lang === "es" 
+						? "Controla si el código QR se muestra en la pantalla de la cola en tiempo real." 
+						: "Control whether the QR code displays on the live queue screen."}
+				</p>
+				<div className="flex items-center justify-between bg-gray-800 rounded-xl p-4">
+					<label className="text-sm font-medium text-gray-300">
+						{lang === "es" ? "Mostrar QR en la cola" : "Show QR on queue display"}
+					</label>
+					<button
+						type="button"
+						onClick={() => qrToggleMutation.mutate(!showQr)}
+						className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+							showQr ? "bg-green-600" : "bg-gray-600"
+						}`}
+					>
+						<span
+							className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+								showQr ? "translate-x-7" : "translate-x-1"
+							}`}
+						/>
+					</button>
+				</div>
+			</div>
+
+		<button
 				type="button"
 				onClick={() => mutation.mutate()}
 				disabled={mutation.isPending}
