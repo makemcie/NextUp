@@ -511,7 +511,7 @@ function RegisterPage() {
 
 				{/* Step 3: Confirmation with Queue Position */}
 				{step === 3 && result && (
-					<QueueConfirmation result={result} lang={lang} />
+					<QueueConfirmation result={result} lang={lang} shopId={shopId} />
 				)}
 			</div>
 
@@ -529,6 +529,7 @@ function RegisterPage() {
 function QueueConfirmation({
 	result,
 	lang,
+	shopId,
 }: {
 	result: {
 		visitId: number;
@@ -539,6 +540,7 @@ function QueueConfirmation({
 		groupResults?: Array<{ name: string; position: number; visitId: number }>;
 	};
 	lang: Lang;
+	shopId: string;
 }) {
 	const t = reg[lang];
 	const { data: posData } = useQuery({
