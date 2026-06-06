@@ -150,7 +150,7 @@ function RegisterPage() {
 			} else {
 					setResult({
 					...first,
-					shopGoogleReviewLink: shop?.google_review_link ?? null,
+					google_review_link: shop?.google_review_link ?? null,
 					groupResults: results.length > 1 ? results.map((r: any, i: number) => ({
 						name: [name, ...groupNames][i] ?? "",
 						position: r.queuePosition ?? i + 1,
