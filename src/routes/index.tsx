@@ -3685,7 +3685,7 @@ function SettingsView({
 					</label>
 					<button
 						type="button"
-						onClick={() => qrToggleMutation.mutate(!showQr)}
+						onClick={() => { const newVal = !showQr; setShowQr(newVal); qrToggleMutation.mutate(newVal); }}
 						className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
 							showQr ? "bg-green-600" : "bg-gray-600"
 						}`}
