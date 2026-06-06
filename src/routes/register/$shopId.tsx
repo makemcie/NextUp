@@ -88,7 +88,7 @@ function RegisterPage() {
 		queuePosition: number;
 		barberName: string;
 		alreadyInQueue?: boolean;
-		shopGoogleReviewLink?: string | null;
+		google_review_link?: string | null;
 		groupResults?: Array<{ name: string; position: number; visitId: number }>;
 	} | null>(null);
 
