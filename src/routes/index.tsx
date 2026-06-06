@@ -416,7 +416,7 @@ function AuthScreen({
 				</p>
 				<div className="a4 lbtn-row" style={{ display:"flex", gap:14, justifyContent:"center", flexWrap:"wrap", marginBottom:60 }}>
 					<button type="button" className="lgb" onClick={() => { setMode("signup"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"16px 40px", background:"linear-gradient(135deg,#f97316,#ea580c)", border:"none", borderRadius:12, color:"white", fontSize:16, fontWeight:700, boxShadow:"0 8px 28px rgba(249,115,22,0.3)", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
-						{lang === "es" ? "3 días gratis — luego $89/mes" : "Start now — $89/mo"}
+						{lang === "es" ? "Empieza ya — $89/mes" : "Start now — $89/mo"}
 					</button>
 					<button type="button" onClick={() => { setMode("login"); setError(""); document.getElementById("goolinext-auth")?.scrollIntoView({behavior:"smooth"}); }} style={{ padding:"16px 40px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:12, color:"#94a3b8", fontSize:16, fontWeight:600, cursor:"pointer", fontFamily:"'Syne','Trebuchet MS','Gill Sans',Arial,sans-serif" }}>
 						{lang === "es" ? "Ya tengo cuenta" : "I already have an account"}
@@ -570,7 +570,7 @@ function AuthScreen({
 							</p>
 						</div>
 						<p style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", color:"#334155", fontSize:12, marginTop:12 }}>
-							{lang === "es" ? "3 días gratis + 7 días de garantía — sin riesgo" : "No credit card required to sign up · Cancel anytime"}
+							{lang === "es" ? "Cancela cuando quieras" : "No credit card required to sign up · Cancel anytime"}
 						</p>
 					</div>
 				</div>
@@ -3959,25 +3959,6 @@ function ReputationView({ shop, lang }: { shop: any; lang: Lang }) {
 						:"Print this code and place it in your business. When people scan it they'll see two options: complaint or Google review."}
 				</p>
 
-				{/* QR Preview */}
-				<div className="flex justify-center">
-					<div className="bg-white rounded-2xl p-4 shadow-lg" style={{maxWidth:200}}>
-						<div className="flex items-center justify-center gap-1 mb-2">
-							<span style={{color:"#4285F4",fontWeight:800,fontSize:14}}>G</span>
-							<span style={{color:"#EA4335",fontWeight:800,fontSize:14}}>o</span>
-							<span style={{color:"#FBBC05",fontWeight:800,fontSize:14}}>o</span>
-							<span style={{color:"#4285F4",fontWeight:800,fontSize:14}}>g</span>
-							<span style={{color:"#34A853",fontWeight:800,fontSize:14}}>l</span>
-							<span style={{color:"#EA4335",fontWeight:800,fontSize:14}}>e</span>
-							<span style={{color:"#5f6368",fontSize:12,marginLeft:2}}>Review</span>
-						</div>
-						<img src={qrApiUrl} alt="QR Code" style={{width:"100%",display:"block",borderRadius:8}} />
-						<div className="flex justify-center gap-0.5 mt-2">
-							{["★","★","★","★","★"].map((s,i)=><span key={i} style={{color:"#FBBC05",fontSize:14}}>{s}</span>)}
-						</div>
-						<p style={{textAlign:"center",fontSize:9,color:"#9ca3af",marginTop:4}}>{lang==="es"?"Escanea y califica":"Scan and rate"}</p>
-					</div>
-				</div>
 
 				{/* URL preview */}
 				<div className="bg-gray-800/50 rounded-xl p-3">

@@ -1,5 +1,5 @@
 // ============================================================
-// lib/messaging.ts
+// lib/messaging-sent.ts
 // Envía SMS via Sent API (reemplaza Twilio)
 // ============================================================
 
@@ -8,7 +8,7 @@
  * @param to - Número telefónico (ej: +16465154329)
  * @param code - Código de verificación o mensaje personalizado
  */
-export async function sendSMSViaSent(to: string, code: string): Promise<boolean> {
+export async function sendSMSViaeSent(to: string, code: string): Promise<boolean> {
 	try {
 		// Obtener API Key de Cloudflare env
 		const mod = await import("cloudflare:workers");
@@ -63,14 +63,9 @@ export async function sendSMSViaSent(to: string, code: string): Promise<boolean>
  * Wrapper para compatibilidad con código existente
  * Reemplaza la anterior función sendSMS de Twilio
  */
-export async function sendSMS({ to, body }: { to: string; body: string }): Promise<{ success: boolean; error?: string }> {
-	try {
-		// Si el body es un código (números), enviarlo como código
-		// Si es un mensaje, enviarlo como mensaje personalizado
-		const code = body.match(/\d{4,8}/) ? body.match(/\d{4,8}/)![0] : body;
-		const success = await sendSMSViaSent(to, code);
-		return { success, error: success ? undefined : "Failed to send SMS via Sent" };
-	} catch (error: any) {
-		return { success: false, error: error.message };
-	}
+export async function sendSMS({ to, body }: { to: string; body: string }): Promise<void> {
+	// Si el body es un código (números), enviarlo como código
+	// Si es un mensaje, enviarlo como mensaje personalizado
+	const code = body.match(/\d{4,8}/) ? body.match(/\d{4,8}/)![0] : body;
+	await sendSMSViaeSent(to, code);
 }

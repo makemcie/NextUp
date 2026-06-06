@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Clock, Scissors, User, Users } from "lucide-react";
@@ -8,10 +9,119 @@ export const Route = createFileRoute("/queue/$shopId")({
 	component: QueueDisplayPage,
 });
 
+function getAvatarUrl(name: string): string {
+	const initials = name
+		.split(" ")
+		.slice(0, 2)
+		.map(n => n[0])
+		.join("")
+		.toUpperCase();
+	
+	return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=f59e0b&color=fff&bold=true&size=128`;
+}
+
+interface Notification {
+	id: string;
+	barberName: string;
+	clientName: string;
+	language: string;
+}
+
+function playNotificationSound(clientName: string, barberName: string, language: string) {
+	if (!("speechSynthesis" in window)) return;
+
+	window.speechSynthesis.cancel();
+
+	const isSpanish = language === "es";
+	const text = isSpanish
+		? `¡Turno para ${clientName}! Pasa con ${barberName}`
+		: `Turn for ${clientName}! Go with ${barberName}`;
+
+	const utterance = new SpeechSynthesisUtterance(text);
+	utterance.lang = isSpanish ? "es-ES" : "en-US";
+	utterance.rate = 0.8;
+	utterance.pitch = 1;
+	utterance.volume = 1;
+
+	// Seleccionar voz más natural disponible
+	const voices = window.speechSynthesis.getVoices();
+	if (voices.length > 0) {
+		// Buscar voz de Google si está disponible
+		const googleVoice = voices.find(v => v.name.includes("Google") || v.name.includes("Microsoft"));
+		if (googleVoice) {
+			utterance.voice = googleVoice;
+		} else {
+			utterance.voice = voices[0];
+		}
+	}
+
+	window.speechSynthesis.speak(utterance);
+}
+
+function NotificationBanner({ notification, onComplete }: { notification: Notification; onComplete: () => void }) {
+	useEffect(() => {
+		playNotificationSound(notification.clientName, notification.barberName, notification.language);
+
+		const timer = setTimeout(() => onComplete(), 5000);
+		return () => {
+			clearTimeout(timer);
+			window.speechSynthesis.cancel();
+		};
+	}, [notification, onComplete]);
+
+	const isSpanish = notification.language === "es";
+
+	return (
+		<div className="fixed top-20 inset-x-0 z-50 flex items-center justify-center px-6">
+			<div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl shadow-2xl px-8 py-6 max-w-2xl animate-pulse border-2 border-green-400">
+				<div className="text-center">
+					<p className="text-white text-xl font-bold mb-2">
+						{isSpanish ? "🎉 ¡TURNO!" : "🎉 YOUR TURN!"}
+					</p>
+					<p className="text-white text-3xl font-black">{notification.clientName}</p>
+					<p className="text-green-100 text-lg mt-3">
+						{isSpanish ? "Pasa con" : "Go with"} {notification.barberName}
+					</p>
+					<p className="text-green-200 text-xs mt-4">🔊 {isSpanish ? "Escuchando..." : "Playing audio..."}</p>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function QRComponent({ shopId }: { shopId: number }) {
+	const [mounted, setMounted] = useState(false);
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
+	if (!mounted) return null;
+
+	const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
+		`${window.location.origin}/register/${shopId}`
+	)}`;
+
+	return (
+		<div className="fixed bottom-20 right-6 bg-gray-900/70 border border-gray-800 rounded-2xl overflow-hidden w-48 z-50">
+			<div className="px-5 py-4 border-b border-gray-800 text-center">
+				<p className="text-xs text-amber-400 font-bold uppercase tracking-wider">SCAN TO JOIN</p>
+			</div>
+			<div className="p-4 flex flex-col items-center gap-3">
+				<img src={qrUrl} alt="QR Register" className="w-28 h-28 bg-white rounded-lg p-1" />
+				<p className="text-xs text-gray-400 text-center text-nowrap">Register & choose</p>
+			</div>
+		</div>
+	);
+}
+
 function QueueDisplayPage() {
 	const { shopId } = Route.useParams();
 	const shopIdNum = Number(shopId);
 	const queryClient = useQueryClient();
+	const [notificationQueue, setNotificationQueue] = useState<Notification[]>([]);
+	const [currentNotification, setCurrentNotification] = useState<Notification | null>(null);
+	const [previousClients, setPreviousClients] = useState<Map<number, string>>(new Map());
 
 	const { data: shop, isLoading: shopLoading } = useQuery({
 		queryKey: ["shopPublic", shopIdNum],
@@ -24,7 +134,42 @@ function QueueDisplayPage() {
 		refetchInterval: 15000,
 	});
 
-	// Real-time updates via WebSocket
+	useEffect(() => {
+		if (!queues || !shop) return;
+
+		const newNotifications: Notification[] = [];
+
+		queues.forEach((queue) => {
+			const barberId = queue.barber.id;
+			const currentClientName = queue.currentClient?.clientName;
+			const previousClientName = previousClients.get(barberId);
+
+			if (currentClientName && currentClientName !== previousClientName) {
+				newNotifications.push({
+					id: `${barberId}-${currentClientName}-${Date.now()}`,
+					barberName: queue.barber.name,
+					clientName: currentClientName,
+					language: shop.language || "en",
+				});
+			}
+
+			if (currentClientName) {
+				setPreviousClients(new Map(previousClients).set(barberId, currentClientName));
+			}
+		});
+
+		if (newNotifications.length > 0) {
+			setNotificationQueue(prev => [...prev, ...newNotifications]);
+		}
+	}, [queues, shop]);
+
+	useEffect(() => {
+		if (currentNotification === null && notificationQueue.length > 0) {
+			setCurrentNotification(notificationQueue[0]);
+			setNotificationQueue(prev => prev.slice(1));
+		}
+	}, [currentNotification, notificationQueue]);
+
 	useWebSocket({
 		onMessage: (msg) => {
 			const data = msg as { type: string; shopId?: number };
@@ -62,7 +207,19 @@ function QueueDisplayPage() {
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
-			{/* Header */}
+			{currentNotification && (
+				<NotificationBanner 
+					notification={currentNotification}
+					onComplete={() => setCurrentNotification(null)}
+				/>
+			)}
+
+			{notificationQueue.length > 0 && (
+				<div className="fixed top-6 right-6 bg-amber-500 rounded-full w-10 h-10 flex items-center justify-center z-40">
+					<span className="text-white font-bold text-sm">{notificationQueue.length}</span>
+				</div>
+			)}
+
 			<div className="bg-gray-950/80 backdrop-blur-xl border-b border-gray-800 px-6 py-5">
 				<div className="max-w-7xl mx-auto flex items-center justify-between">
 					<div className="flex items-center gap-4">
@@ -86,7 +243,6 @@ function QueueDisplayPage() {
 				</div>
 			</div>
 
-			{/* Barber Queues Grid */}
 			<div className="max-w-7xl mx-auto px-6 py-6">
 				{queues && queues.length > 0 ? (
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -102,7 +258,8 @@ function QueueDisplayPage() {
 				)}
 			</div>
 
-			{/* Footer */}
+			<QRComponent shopId={shopIdNum} />
+
 			<div className="fixed bottom-0 inset-x-0 border-t border-gray-800/50 bg-gray-950/80 backdrop-blur-xl py-3">
 				<p className="text-center text-xs text-gray-600">
 					Scan the QR code to join the line · Powered by{" "}
@@ -117,7 +274,7 @@ function BarberQueueCard({
 	queue,
 }: {
 	queue: {
-		barber: { id: number; name: string; specialty: string | null };
+		barber: { id: number; name: string; specialty: string | null; photoUrl: string | null };
 		currentClient: {
 			visitId: number;
 			clientName: string;
@@ -132,34 +289,33 @@ function BarberQueueCard({
 	};
 }) {
 	const isServing = queue.currentClient !== null;
+	const avatarUrl = queue.barber.photoUrl || getAvatarUrl(queue.barber.name);
 
 	return (
 		<div className="bg-gray-900/70 border border-gray-800 rounded-2xl overflow-hidden">
-			{/* Barber Header */}
 			<div
 				className={`px-5 py-4 border-b ${isServing ? "border-green-500/30 bg-green-500/5" : "border-gray-800"}`}
 			>
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<div
-							className={`w-11 h-11 rounded-full flex items-center justify-center ${isServing ? "bg-gradient-to-br from-green-500 to-emerald-600" : "bg-gradient-to-br from-amber-500/30 to-orange-600/30"}`}
-						>
-							<Scissors
-								className={`w-5 h-5 ${isServing ? "text-white" : "text-amber-400"}`}
-							/>
-						</div>
-						<div>
-							<p className="text-white font-semibold text-lg">
+				<div className="flex items-center justify-between gap-2">
+					<div className="flex items-center gap-3 flex-1 min-w-0">
+						<img 
+							src={avatarUrl}
+							alt={queue.barber.name}
+							className="w-11 h-11 rounded-full flex-shrink-0 object-cover"
+						/>
+
+						<div className="min-w-0 flex-1">
+							<p className="text-white font-semibold text-sm truncate">
 								{queue.barber.name}
 							</p>
 							{queue.barber.specialty && (
-								<p className="text-xs text-gray-500">
+								<p className="text-xs text-gray-500 truncate">
 									{queue.barber.specialty}
 								</p>
 							)}
 						</div>
 					</div>
-					<div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-full">
+					<div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-full flex-shrink-0">
 						<Users className="w-3.5 h-3.5 text-amber-400" />
 						<span className="text-amber-400 font-bold text-sm">
 							{queue.waitingCount}
@@ -168,7 +324,6 @@ function BarberQueueCard({
 				</div>
 			</div>
 
-			{/* Current Client */}
 			{queue.currentClient && (
 				<div className="px-5 py-3 bg-green-500/5 border-b border-green-500/20">
 					<p className="text-xs text-green-500 font-medium uppercase tracking-wider mb-1">
@@ -183,7 +338,6 @@ function BarberQueueCard({
 				</div>
 			)}
 
-			{/* Waiting List */}
 			<div className="divide-y divide-gray-800/50">
 				{queue.waitingClients.length > 0 ? (
 					queue.waitingClients.map((client, index) => (

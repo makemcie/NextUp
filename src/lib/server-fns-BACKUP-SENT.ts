@@ -19,12 +19,22 @@ function getDateBoundsInTz(dateStr: string, tz: string): { start: Date; end: Dat
 	};
 }
 
+async function getTwilioCreds() {
+	const mod = await import("cloudflare:workers");
+	const env = mod.env as Record<string, string>;
+	return {
+		sid: env.TWILIO_SID ?? "",
+		token: env.TWILIO_TOKEN ?? "",
+		phone: env.TWILIO_PHONE ?? "",
+	};
+}
+
 async function sendSmsSafe(to: string, body: string): Promise<void> {
 	try {
-		await sendSMS({ to, body });
-	} catch (error) {
-		console.error("Error sending SMS via Sent:", error);
-	}
+		const creds = await getTwilioCreds();
+		if (!creds.sid || !creds.token || !creds.phone) return;
+		await sendSMS({ to, body, twilioSid: creds.sid, twilioToken: creds.token, twilioPhone: creds.phone });
+	} catch {}
 }
 
 // ============ SESSION HELPERS ============
@@ -1222,8 +1232,14 @@ export const processFollowUps = createServerFn({ method: "POST" }).handler(
 						message = `Thanks for visiting ${shop.name}! Reply STOP to opt out.`;
 					}
 
-					const result = await sendSMS({ to: client.phone, body: message,
-					 });
+					const twilioF = await getTwilioCreds();
+					const result = await sendSMS({
+						twilioSid: twilioF.sid,
+						twilioToken: twilioF.token,
+						twilioPhone: twilioF.phone,
+						to: client.phone,
+						body: message,
+					});
 					if (result.success) sent++;
 					else errors++;
 				}
@@ -1306,8 +1322,14 @@ export const processReminders = createServerFn({ method: "POST" }).handler(
 						.replace("{barberia}", shop.name)
 						.replace("{shop}", shop.name);
 
-					const result = await sendSMS({ to: client.phone, body: message,
-					 });
+					const twilioF = await getTwilioCreds();
+					const result = await sendSMS({
+						twilioSid: twilioF.sid,
+						twilioToken: twilioF.token,
+						twilioPhone: twilioF.phone,
+						to: client.phone,
+						body: message,
+					});
 
 					if (result.success) {
 						totalSent++;
@@ -2298,6 +2320,7 @@ export const updateClientCallStatus = createServerFn({ method: "POST" })
 		return { success: true };
 	});
 
+
 // ============ REVIEW PAGE ============
 export const getShopReviewPage = createServerFn({ method: "GET" })
 	.inputValidator((input: { shopId: number }) => input)
@@ -2479,6 +2502,7 @@ export const activateSubscription = createServerFn({ method: "POST" })
 
 // ============ APPOINTMENTS ============
 
+
 // Get available time slots for a barber on a specific date
 export const getAvailableSlots = createServerFn({ method: "GET" })
 	.inputValidator((input: { shopId: number; barberId: number; date: string }) => input)
@@ -2607,13 +2631,14 @@ export const createAppointment = createServerFn({ method: "POST" })
 		notifyBarberNewAppointment(data.barberId, data.clientName, data.date, data.time).catch(() => {});
 
 		// Send confirmation SMS
-		if (data.clientPhone) {
+		const creds = await getTwilioCreds();
+		if (creds.sid && data.clientPhone) {
 			const dateFormatted = new Date(data.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 			const timeFormatted = formatTime12(data.time);
 			sendSMS({
 				to: data.clientPhone,
 				body: `✅ Appointment confirmed at ${shopInfo[0]?.name}!\n${data.clientName} with ${barberInfo[0]?.name}\n📅 ${dateFormatted} at ${timeFormatted}\nReply STOP to opt out.`,
-				
+				...creds,
 			}).catch(() => {});
 		}
 
@@ -2751,6 +2776,7 @@ async function notifyBarberNewAppointment(barberId: number, clientName: string, 
 
 	if (!barber[0]?.phone) return;
 
+	const creds = await getTwilioCreds();
 	if (!creds.sid) return;
 
 	const dateFormatted = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -2763,7 +2789,7 @@ async function notifyBarberNewAppointment(barberId: number, clientName: string, 
 Client: ${clientName}
 ${dateFormatted} at ${fmt}
 Check your portal for details.`,
-		
+		...creds,
 	}).catch(() => {});
 }
 
@@ -2791,6 +2817,7 @@ export const cancelAppointment = createServerFn({ method: "POST" })
 // Process appointment reminders (call every 30 min)
 export const processAppointmentReminders = createServerFn({ method: "POST" })
 	.handler(async () => {
+		const creds = await getTwilioCreds();
 		if (!creds.sid) return { sent: 0 };
 
 		const now = new Date();
@@ -2827,7 +2854,7 @@ export const processAppointmentReminders = createServerFn({ method: "POST" })
 				await sendSMS({
 					to: appt.clientPhone,
 					body: `⏰ Reminder: Your appointment at ${appt.shopName} with ${appt.barberName} is today at ${formatTime12(appt.appointmentTime)}. See you soon! 💈`,
-					
+					...creds,
 				}).catch(() => {});
 
 				await (await db())
@@ -2889,12 +2916,13 @@ export const requestCancelAppointment = createServerFn({ method: "POST" })
 			.all();
 
 		// SMS to owner
-		if (owner[0]?.phone) {
+		const creds = await getTwilioCreds();
+		if (creds.sid && owner[0]?.phone) {
 			const dateFormatted = new Date(appt[0].appointmentDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 			await sendSMS({
 				to: owner[0].phone,
 				body: `⚠️ ${appt[0].barberName} has requested to cancel the appointment with ${appt[0].clientName} on ${dateFormatted} at ${appt[0].appointmentTime}. Please review in your dashboard.`,
-				
+				...creds,
 			}).catch(() => {});
 		}
 
@@ -2921,6 +2949,7 @@ export const confirmCancelAppointment = createServerFn({ method: "POST" })
 			.where(eq(appointments.id, data.appointmentId));
 
 		// SMS to client
+		const creds = await getTwilioCreds();
 		const shopInfo = await (await db())
 			.select({ name: shops.name })
 			.from(shops)
@@ -2928,11 +2957,11 @@ export const confirmCancelAppointment = createServerFn({ method: "POST" })
 			.limit(1)
 			.all();
 
-		if (appt[0].clientPhone) {
+		if (creds.sid && appt[0].clientPhone) {
 			await sendSMS({
 				to: appt[0].clientPhone,
 				body: `We're sorry, your appointment at ${shopInfo[0]?.name} on ${appt[0].appointmentDate} at ${appt[0].appointmentTime} has been cancelled. Please contact us to reschedule.`,
-				
+				...creds,
 			}).catch(() => {});
 		}
 
@@ -3087,7 +3116,8 @@ export const processAppointmentsToQueue = createServerFn({ method: "POST" })
 					.where(eq(appointments.id, appt.id));
 
 				// SMS to client
-				if (appt.clientPhone) {
+				const creds = await getTwilioCreds();
+				if (creds.sid && appt.clientPhone) {
 					const shopInfo = await (await db())
 						.select({ name: shops.name })
 						.from(shops)
@@ -3098,7 +3128,7 @@ export const processAppointmentsToQueue = createServerFn({ method: "POST" })
 					await sendSMS({
 						to: appt.clientPhone,
 						body: `Hi ${appt.clientName}! Your appointment at ${shopInfo[0]?.name} has been added to the queue. Please check in when you arrive. 💈`,
-						
+						...creds,
 					}).catch(() => {});
 				}
 
