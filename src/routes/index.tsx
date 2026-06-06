@@ -2648,18 +2648,18 @@ function QRView({
 					</div>
 				</div>
 				<div className="bg-gray-800 rounded-xl p-3 mb-3">
-					<p className="text-amber-400 text-xs break-all font-mono">{bizUrl}</p>
+					<p className="text-amber-400 text-xs break-all font-mono">{registerUrl}</p>
 				</div>
 				<div className="flex gap-2">
 					<button
 						type="button"
-						onClick={() => navigator.clipboard.writeText(bizUrl)}
+						onClick={() => navigator.clipboard.writeText(registerUrl)}
 						className="flex-1 py-2 rounded-lg bg-amber-500/15 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-all"
 					>
 						{lang === "es" ? "📋 Copiar link" : "📋 Copy link"}
 					</button>
 					<a
-						href={bizUrl}
+						href={registerUrl}
 						target="_blank"
 						rel="noopener noreferrer"
 						className="flex-1 py-2 rounded-lg border border-amber-500/30 text-amber-400 text-xs font-semibold text-center hover:bg-amber-500/10 transition-all"

@@ -228,7 +228,7 @@ function QueueDisplayPage() {
 						</div>
 						<div>
 							<h1 className="text-2xl font-bold text-white">{shop.name}</h1>
-							<p className="text-sm text-gray-500">Cola en tiempo real</p>
+							<p className="text-sm text-gray-500">Live Queue</p>
 						</div>
 					</div>
 					<div className="flex items-center gap-6">
