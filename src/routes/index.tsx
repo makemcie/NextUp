@@ -1821,7 +1821,7 @@ function BarberPhotoAvatar({
 					ctx.imageSmoothingEnabled = true;
 					ctx.imageSmoothingQuality = "high";
 					ctx.drawImage(img, 0, 0, w, h);
-					resolve(c.toDataURL("image/jpeg", 0.92));
+					resolve(c.toDataURL("image/jpeg", 0.98));
 				};
 				img.onerror = reject;
 				img.src = reader.result as string;
@@ -3534,7 +3534,7 @@ function SettingsView({
 					ctx.imageSmoothingEnabled = true;
 					ctx.imageSmoothingQuality = "high";
 					ctx.drawImage(img, 0, 0, w, h);
-					resolve(c.toDataURL("image/jpeg", 0.92));
+					resolve(c.toDataURL("image/jpeg", 0.98));
 				};
 				img.onerror = reject;
 				img.src = reader.result as string;

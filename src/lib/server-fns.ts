@@ -685,6 +685,7 @@ export const getShopPublic = createServerFn({ method: "GET" })
 				smsConsentText: shops.smsConsentText,
 				smsEnabled: shops.smsEnabled,
 				googleReviewLink: shops.googleReviewLink,
+				showQr: shops.showQr,
 			})
 			.from(shops)
 			.where(eq(shops.id, data.shopId))
@@ -1414,6 +1415,7 @@ export const getShopQueues = createServerFn({ method: "GET" })
 						id: barber.id,
 						name: barber.name,
 						specialty: barber.specialty,
+						photoUrl: barber.photoUrl,
 					},
 					currentClient: currentClient[0] ?? null,
 					waitingClients,
