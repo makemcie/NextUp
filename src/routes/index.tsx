@@ -97,6 +97,53 @@ import { useWebSocket } from "@/lib/websocket";
 
 export const Route = createFileRoute("/")({ component: AdminDashboard });
 
+// GoolinextIcon - Componente para reemplazar Scissors
+const GoolinextIcon = ({ className = "" }: { className?: string }) => {
+  const sizeMap: Record<string, number> = {
+    "w-4 h-4": 16,
+    "w-5 h-5": 20,
+    "w-6 h-6": 24,
+    "w-8 h-8": 32,
+    "w-10 h-10": 40,
+    "w-12 h-12": 48,
+    "w-16 h-16": 64,
+  };
+  
+  let size = 32;
+  for (const [key, value] of Object.entries(sizeMap)) {
+    if (className.includes(key)) {
+      size = value;
+      break;
+    }
+  }
+  
+  const color = className.includes("text-white") ? "white" 
+              : className.includes("text-green-400") ? "#4ade80"
+              : className.includes("text-amber-400") ? "#fbbf24"
+              : className.includes("text-gray-600") ? "#4b5563"
+              : className.includes("text-gray-700") ? "#374151"
+              : "currentColor";
+  
+  return (
+    <span 
+      className={className}
+      style={{
+        fontFamily: "Plus Jakarta Sans, sans-serif",
+        fontWeight: 800,
+        fontSize: `${size * 0.75}px`,
+        lineHeight: 1,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: color,
+      }}
+    >
+      G
+    </span>
+  );
+};
+
+
 // ============ LANGUAGE TOGGLE ============
 
 function getSavedLang(): Lang {
