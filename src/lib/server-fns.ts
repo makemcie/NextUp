@@ -1614,23 +1614,29 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 			.all();
 		if (shop.length === 0) throw new Error("Not authorized");
 
-		const totalClients = await (await db())
+		const totalClientsResult = await (await db())
 			.select({ count: count() })
 			.from(clients)
-			.where(eq(clients.shopId, data.shopId));
+			.where(eq(clients.shopId, data.shopId))
+			.all();
+		
+		const totalClients = totalClientsResult[0]?.count ?? 0;
 
 		// Today's visits only
 		const today = new Date();
 		const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 		const todayEnd = new Date(todayStart.getTime() + 24*60*60*1000);
-		const totalVisits = await (await db())
+		const totalVisitsResult = await (await db())
 			.select({ count: count() })
 			.from(visits)
 			.where(and(
 				eq(visits.shopId, data.shopId),
 				gte(visits.createdAt, todayStart),
 				lte(visits.createdAt, todayEnd),
-			));
+			))
+			.all();
+		
+		const totalVisits = totalVisitsResult[0]?.count ?? 0;
 
 		const recentVisits = await (await db())
 			.select({
@@ -1654,7 +1660,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 
 		return {
 			totalClients,
-			totalVisits: totalVisits[0].count,
+			totalVisits,
 			recentVisits,
 		};
 	});
