@@ -519,7 +519,7 @@ function AuthScreen({
 							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
 							tag: lang === "es" ? "VISIBILIDAD TOTAL DEL DUEÑO" : "FULL OWNER VISIBILITY",
 							title: lang === "es" ? "Portal de Empleados" : "Team Management Portal",
-							desc: lang === "es" ? "Cada barbero tiene su propio login y ve solo su cola. Tú ves todo — cada barbero, cada cliente, cada servicio. Transparencia total sin micromanagement." : "Each barber logs in and sees only their queue. You see everything — every barber, every client, every service. Total transparency, zero micromanagement.",
+							desc: lang === "es" ? "Cada empleado tiene su propio login y ve solo su cola. Tú ves todo — cada empleado, cada cliente, cada servicio. Transparencia total sin micromanagement." : "Each barber logs in and sees only their queue. You see everything — every staff member, every client, every service. Total transparency, zero micromanagement.",
 						},
 						{
 							svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
@@ -556,7 +556,7 @@ function AuthScreen({
 					<div className="lsteps" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))", gap:28 }}>
 						{[
 							["01", lang === "es" ? "Crea tu cuenta" : "Create your account", lang === "es" ? "Regístrate con tu email en 2 minutos. Agrega el nombre, dirección y horarios de tu barbería." : "Sign up with your email in 2 minutes. Add your barbershop name, address and hours."],
-							["02", lang === "es" ? "Configura tu equipo" : "Set up your team", lang === "es" ? "Agrega cada barbero con su nombre, teléfono y código de acceso único." : "Add each barber with their name, phone and unique login code."],
+							["02", lang === "es" ? "Configura tu equipo" : "Set up your team", lang === "es" ? "Agrega cada empleado con su nombre, teléfono y código de acceso único." : "Add each staff member with their name, phone and unique login code."],
 							["03", lang === "es" ? "Sal en vivo al instante" : "Go live instantly", lang === "es" ? "Tu página pública y código QR están listos. Comparte el link — los clientes reservan de inmediato." : "Your public page and QR code are ready. Share the link — clients book immediately."],
 							["04", lang === "es" ? "Goolinext hace el resto" : "Goolinext does the rest", lang === "es" ? "El sistema maneja la cola, las citas, los recordatorios y el seguimiento automáticamente." : "The system handles the queue, appointments, reminders and follow-ups automatically."],
 						].map(([step,title,desc],i) => (
@@ -599,7 +599,7 @@ function AuthScreen({
 								lang === "es" ? "Control de flujo y organización del negocio" : "Flow control and business organization",
 								lang === "es" ? "Visibilidad completa de tu operación" : "Full visibility of your operation",
 								lang === "es" ? "Soporte personal por WhatsApp 24/7" : "WhatsApp priority support",
-								lang === "es" ? "Clientes y barberos ilimitados" : "Unlimited clients and staff",
+								lang === "es" ? "Clientes y empleados ilimitados" : "Unlimited clients and staff",
 							].map((item,i) => (
 								<p key={i} style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:13, color:"#64748b", display:"flex", alignItems:"center", gap:8, margin:0 }}>
 									<span style={{ color:"#f97316" }}>✓</span>{item}
@@ -2352,7 +2352,7 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 								{/* Barber Phone for SMS notifications */}
 								<div className="mt-3 pt-3 border-t border-gray-800">
 									<div className="flex items-center gap-2">
-										<span className="text-xs text-gray-500 flex items-center gap-1">📱 {lang === "es" ? "Tel barbero:" : "Barber phone:"}</span>
+										<span className="text-xs text-gray-500 flex items-center gap-1">📱 {lang === "es" ? "Tel empleado:" : "Staff phone:"}</span>
 										{editingPhone?.id === b.id ? (
 											<>
 												<input type="tel" value={editingPhone.phone} onChange={(e) => setEditingPhone({ id: b.id, phone: e.target.value })} placeholder="+1XXXXXXXXXX" className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs focus:outline-none" />
@@ -3175,7 +3175,7 @@ function PaywallScreen({ lang: initialLang, onPaid, isExpired }: { lang: Lang; o
 						lang === "es" ? "Base de datos de clientes (exportable)" : "Client database (exportable)",
 						lang === "es" ? "QR para gestionar reseñas y reputación" : "QR to manage reviews and reputation",
 						lang === "es" ? "Control total del flujo de clientes" : "Full client flow control",
-						lang === "es" ? "Clientes y barberos ilimitados" : "Unlimited clients and staff",
+						lang === "es" ? "Clientes y empleados ilimitados" : "Unlimited clients and staff",
 						lang === "es" ? "Soporte personal por WhatsApp 24/7" : "Personal WhatsApp support 24/7",
 					].map((feature, i) => (
 						<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0" }}>
