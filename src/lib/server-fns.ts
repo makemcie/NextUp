@@ -1653,7 +1653,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 			.all();
 
 		return {
-			totalClients: totalClients[0].count,
+			totalClients,
 			totalVisits: totalVisits[0].count,
 			recentVisits,
 		};
