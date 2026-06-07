@@ -9,7 +9,7 @@ import {
 	Mail,
 	MapPin,
 	Phone,
-	Scissors,
+	
 	User,
 	Users,
 } from "lucide-react";
@@ -25,6 +25,52 @@ import {
 export const Route = createFileRoute("/register/$shopId")({
 	component: RegisterPage,
 });
+
+// GoolinextIcon - Componente para reemplazar Scissors
+const GoolinextIcon = ({ className = "" }: { className?: string }) => {
+  const sizeMap: Record<string, number> = {
+    "w-4 h-4": 16,
+    "w-5 h-5": 20,
+    "w-6 h-6": 24,
+    "w-8 h-8": 32,
+    "w-10 h-10": 40,
+    "w-12 h-12": 48,
+    "w-16 h-16": 64,
+  };
+  
+  let size = 32;
+  for (const [key, value] of Object.entries(sizeMap)) {
+    if (className.includes(key)) {
+      size = value;
+      break;
+    }
+  }
+  
+  const color = className.includes("text-white") ? "white" 
+              : className.includes("text-green-400") ? "#4ade80"
+              : className.includes("text-amber-400") ? "#fbbf24"
+              : className.includes("text-gray-600") ? "#4b5563"
+              : className.includes("text-gray-700") ? "#374151"
+              : "currentColor";
+  
+  return (
+    <span 
+      className={className}
+      style={{
+        fontFamily: "Plus Jakarta Sans, sans-serif",
+        fontWeight: 800,
+        fontSize: `${size * 0.75}px`,
+        lineHeight: 1,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: color,
+      }}
+    >
+      G
+    </span>
+  );
+};
 
 function getSavedLang(): Lang {
 	if (typeof window === "undefined") return "en";
@@ -178,7 +224,7 @@ function RegisterPage() {
 			<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
 				<div className="text-center">
 					<div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-						<Scissors className="w-8 h-8 text-gray-600" />
+						<GoolinextIcon className="w-8 h-8 text-gray-600" />
 					</div>
 					<h2 className="text-xl font-bold text-white mb-2">{t.notFound}</h2>
 					<p className="text-gray-500">{t.notFoundDesc}</p>
@@ -203,7 +249,7 @@ function RegisterPage() {
 				<div className="max-w-lg mx-auto flex items-center justify-between">
 					<div className="flex items-center gap-3 min-w-0">
 						<div className="w-11 h-11 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
-							<Scissors className="w-5 h-5 text-white" />
+							<GoolinextIcon className="w-5 h-5 text-white" />
 						</div>
 						<div className="min-w-0">
 							<h1 className="text-lg font-bold text-white truncate">
@@ -452,7 +498,7 @@ function RegisterPage() {
 														: "bg-gradient-to-br from-amber-500/20 to-orange-600/20"
 												}`}
 											>
-												<Scissors
+												<GoolinextIcon
 													className={`w-7 h-7 ${
 														selectedBarber === barber.id
 															? "text-white"
@@ -479,7 +525,7 @@ function RegisterPage() {
 							</div>
 						) : (
 							<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 text-center">
-								<Scissors className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+								<GoolinextIcon className="w-10 h-10 text-gray-600 mx-auto mb-3" />
 								<p className="text-gray-500">{t.noBarbers}</p>
 							</div>
 						)}

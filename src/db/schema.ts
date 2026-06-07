@@ -78,6 +78,7 @@ export const shops = sqliteTable("shops", {
 		.notNull()
 		.default(sql`(unixepoch())`),
 	showQr: integer("show_qr", { mode: "boolean" }).notNull().default(true),
+	announceTurnEnabled: integer("announce_turn_enabled", { mode: "boolean" }).notNull().default(true),
 });
 
 // Barbers/Stylists

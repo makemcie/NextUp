@@ -1,13 +1,59 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Clock, Scissors, User, Users } from "lucide-react";
+import { Clock, User, Users } from "lucide-react";
 import { getShopPublic, getShopQueues } from "@/lib/server-fns";
 import { useWebSocket } from "@/lib/websocket";
 
 export const Route = createFileRoute("/queue/$shopId")({
 	component: QueueDisplayPage,
 });
+
+// GoolinextIcon - Componente para reemplazar Scissors
+const GoolinextIcon = ({ className = "" }: { className?: string }) => {
+  const sizeMap: Record<string, number> = {
+    "w-4 h-4": 16,
+    "w-5 h-5": 20,
+    "w-6 h-6": 24,
+    "w-8 h-8": 32,
+    "w-10 h-10": 40,
+    "w-12 h-12": 48,
+    "w-16 h-16": 64,
+  };
+  
+  let size = 32;
+  for (const [key, value] of Object.entries(sizeMap)) {
+    if (className.includes(key)) {
+      size = value;
+      break;
+    }
+  }
+  
+  const color = className.includes("text-white") ? "white" 
+              : className.includes("text-green-400") ? "#4ade80"
+              : className.includes("text-amber-400") ? "#fbbf24"
+              : className.includes("text-gray-600") ? "#4b5563"
+              : className.includes("text-gray-700") ? "#374151"
+              : "currentColor";
+  
+  return (
+    <span 
+      className={className}
+      style={{
+        fontFamily: "Plus Jakarta Sans, sans-serif",
+        fontWeight: 800,
+        fontSize: `${size * 0.75}px`,
+        lineHeight: 1,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: color,
+      }}
+    >
+      G
+    </span>
+  );
+};
 
 function getAvatarUrl(name: string): string {
 	const initials = name
@@ -198,7 +244,7 @@ function QueueDisplayPage() {
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
 				<div className="text-center">
-					<Scissors className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+					<GoolinextIcon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
 					<h2 className="text-xl font-bold text-white">No encontrada</h2>
 				</div>
 			</div>
@@ -226,7 +272,7 @@ function QueueDisplayPage() {
 				<div className="max-w-7xl mx-auto flex items-center justify-between">
 					<div className="flex items-center gap-4">
 						<div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
-							<Scissors className="w-6 h-6 text-white" />
+							<GoolinextIcon className="w-6 h-6 text-white" />
 						</div>
 						<div>
 							<h1 className="text-2xl font-bold text-white">{shop.name}</h1>
@@ -254,7 +300,7 @@ function QueueDisplayPage() {
 					</div>
 				) : (
 					<div className="text-center py-20">
-						<Scissors className="w-16 h-16 text-gray-700 mx-auto mb-4" />
+						<GoolinextIcon className="w-16 h-16 text-gray-700 mx-auto mb-4" />
 						<p className="text-gray-500 text-lg">No active barbers</p>
 					</div>
 				)}

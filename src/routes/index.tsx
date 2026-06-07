@@ -22,7 +22,7 @@ import {
 	Plus,
 	QrCode,
 	RefreshCw,
-	Scissors,
+	
 	Search,
 	Settings,
 	Shield,
@@ -751,7 +751,7 @@ function WelcomeScreen({
 				</div>
 				<div className="text-center mb-6">
 					<div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-						<Scissors className="w-8 h-8 text-white" />
+						<GoolinextIcon className="w-8 h-8 text-white" />
 					</div>
 					<h1 className="text-2xl font-bold text-white">{t.setupTitle}</h1>
 				</div>
@@ -1009,7 +1009,7 @@ function Dashboard({
 	const tabs = [
 		{ key: "dashboard" as const, label: t.tabHome, icon: Store },
 		{ key: "queue" as const, label: t.tabQueue, icon: List },
-		{ key: "barbers" as const, label: t.tabBarbers, icon: Scissors },
+		{ key: "barbers" as const, label: t.tabBarbers, icon: GoolinextIcon },
 		{ key: "qr" as const, label: t.tabQR, icon: QrCode },
 		{ key: "clients" as const, label: t.tabClients, icon: Database },
 		{ key: "reports" as const, label: lang === "es" ? "Reportes" : "Reports", icon: BarChart2 },
@@ -1033,7 +1033,7 @@ function Dashboard({
 				<div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
 					<div className="flex items-center gap-3">
 						<div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
-							<Scissors className="w-5 h-5 text-white" />
+							<GoolinextIcon className="w-5 h-5 text-white" />
 						</div>
 						<div>
 							<h1 className="text-lg font-bold text-white">{shop.name}</h1>
@@ -1590,7 +1590,7 @@ function QueueView({ shopId, lang }: { shopId: number; lang: Lang }) {
 				<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5">
 					<div className="flex items-center gap-3 mb-2">
 						<div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
-							<Scissors className="w-5 h-5 text-green-400" />
+							<GoolinextIcon className="w-5 h-5 text-green-400" />
 						</div>
 					</div>
 					<p className="text-3xl font-bold text-white">{totalServing}</p>
@@ -1628,7 +1628,7 @@ function QueueView({ shopId, lang }: { shopId: number; lang: Lang }) {
 									<div
 										className={`w-10 h-10 rounded-full flex items-center justify-center ${q.currentClient ? "bg-gradient-to-br from-green-500 to-emerald-600" : "bg-gradient-to-br from-amber-500/30 to-orange-600/30"}`}
 									>
-										<Scissors
+										<GoolinextIcon
 											className={`w-4 h-4 ${q.currentClient ? "text-white" : "text-amber-400"}`}
 										/>
 									</div>
@@ -1856,7 +1856,7 @@ function BarberPhotoAvatar({
 					<div
 						className={`${dims} rounded-full bg-gradient-to-br from-amber-500/20 to-orange-600/20 flex items-center justify-center border-2 border-gray-700 group-hover:border-amber-500/50 transition-all`}
 					>
-						<Scissors className={`${iconSize} text-amber-400`} />
+						<GoolinextIcon className={`${iconSize} text-amber-400`} />
 					</div>
 				)}
 				{onUpload && (
@@ -2330,7 +2330,7 @@ function BarbersView({ shopId, lang }: { shopId: number; lang: Lang }) {
 				</div>
 			) : (
 				<div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 text-center">
-					<Scissors className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+					<GoolinextIcon className="w-10 h-10 text-gray-600 mx-auto mb-3" />
 					<p className="text-gray-500">{t.noBarbersMsg}</p>
 				</div>
 			)}
@@ -3092,7 +3092,7 @@ function PaywallScreen({ lang: initialLang, onPaid, isExpired }: { lang: Lang; o
 
 			<div style={{ maxWidth: 440, width: "100%", background: "rgba(15,15,20,0.95)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 24, padding: "40px 32px", boxShadow: "0 25px 60px rgba(0,0,0,0.5)", textAlign: "center" }}>
 				<div style={{ width: 64, height: 64, background: "linear-gradient(135deg, #f97316, #ea580c)", borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-					<Scissors className="w-8 h-8 text-white" />
+					<GoolinextIcon className="w-8 h-8 text-white" />
 				</div>
 				<h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "white", marginBottom: 8 }}>Goolinext Pro</h1>
 				{isExpired && (
@@ -3377,6 +3377,7 @@ function SettingsView({
 	);
 	const [logoUrl, setLogoUrl] = useState(fullShop?.logoUrl ?? "");
 	const [showQr, setShowQr] = useState(fullShop?.showQr ?? true);
+	const [announceTurnEnabled, setAnnounceTurnEnabled] = useState(fullShop?.announceTurnEnabled ?? true);
 	const [ownerPhone, setOwnerPhone] = useState("");
 
 	// Load owner phone
