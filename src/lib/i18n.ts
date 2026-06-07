@@ -47,7 +47,7 @@ export const reg = {
 	en: {
 		loading: "Loading...",
 		notFound: "Not found",
-		notFoundDesc: "This barbershop doesn't exist or is no longer available.",
+		notFoundDesc: "This salon doesn't exist or is no longer available.",
 		welcome: "Welcome! 👋",
 		subtitle: "Sign up to get in line",
 		name: "Your name",
@@ -60,18 +60,18 @@ export const reg = {
 		required: "*",
 		next: "Next",
 		step: (n: number) => `Step ${n} of 3`,
-		chooseBarber: "Choose your barber ✂️",
+		chooseBarber: "Choose your staff member ✂️",
 		chooseBarberSub: "Who will serve you today?",
 		back: "Back",
-		noBarbers: "No barbers available at this time.",
+		noBarbers: "No staff available at this time.",
 		confirm: "Confirm registration",
 		registering: "Registering...",
 		error: "Registration failed. Please try again.",
 		yourTurn: "It's your turn! 🎉",
 		goTo: "Go to",
-		barberWaiting: "Your barber is waiting for you",
+		barberWaiting: "Your staff member is waiting for you",
 		inLine: "You're in line!",
-		barber: "Barber:",
+		barber: "Staff:",
 		position: "Your position",
 		youreNext: "You're next!",
 		peopleBefore: (n: number) =>
@@ -158,7 +158,7 @@ export const dash = {
 		notLinked: "Sin vincular",
 		regenerateCode: "Regenerar",
 		unlinkBarberBtn: "Desvincular",
-		barberAccountInfo:
+		staffAccountInfo:
 			"Comparte el código de acceso con cada empleado para que vincule su cuenta y maneje su propia cola.",
 		// QR
 		qrTitle: "Código QR de tu negocio",
@@ -240,7 +240,7 @@ export const dash = {
 		// Tabs
 		tabHome: "Home",
 		tabQueue: "Queue",
-		tabBarbers: "Barbers",
+		tabBarbers: "Staff",
 		tabQR: "QR Code",
 		tabClients: "Clients",
 		tabSettings: "Settings",
@@ -264,17 +264,17 @@ export const dash = {
 		completeBtn: "Complete",
 		noMoreWaiting: "No more clients waiting",
 		noClientsQueue: "No clients in queue",
-		addBarbersFirst: "Add barbers to see their queue.",
+		addBarbersFirst: "Add staff to see their queue.",
 		now: "now",
 		cancel: "Cancel",
 		// Barbers
-		barbersTitle: "Barbers / Stylists",
+		barbersTitle: "Staff / Stylists",
 		add: "Add",
-		barberName: "Barber name",
+		barberName: "Staff member name",
 		barberSpecialty: "Specialty (optional)",
 		addingBarber: "Adding...",
-		addBarber: "Add barber",
-		noBarbersMsg: "Add your barbers so clients can choose them.",
+		addBarber: "Add staff member",
+		noBarbersMsg: "Add your staff so clients can choose them.",
 		// Availability
 		availabilityTitle: "Availability",
 		workDaysLabel: "Work days",
@@ -308,18 +308,18 @@ export const dash = {
 		notLinked: "Not linked",
 		regenerateCode: "Regenerate",
 		unlinkBarberBtn: "Unlink",
-		barberAccountInfo:
-			"Share the access code with each barber so they can link their account and manage their own queue.",
+		staffAccountInfo:
+			"Share the access code with each staff member so they can link their account and manage their own queue.",
 		// QR
 		qrTitle: "Your business QR Code",
 		qrDesc:
-			"Print this code and place it at your barbershop entrance. Clients scan it to register.",
+			"Print this code and place it at your salon entrance. Clients scan it to register.",
 		qrLink: "Registration link:",
 		qrTip:
-			"💡 Clients scan → register → choose their barber → receive automatic messages",
+			"💡 Clients scan → register → choose their staff member → receive automatic messages",
 		// Clients
 		clientsTitle: "Client database",
-		clientsDesc: "All registered clients at your barbershop",
+		clientsDesc: "All registered clients at your salon",
 		clientName: "Name",
 		clientPhone: "Phone",
 		clientSms: "SMS",
@@ -373,7 +373,7 @@ export const dash = {
 		saved: "✓ Changes saved",
 		// Setup
 		setupTitle: "Goolinext",
-		setupSubtitle: "Set up your barbershop or salon",
+		setupSubtitle: "Set up your salon or salon",
 		setupName: "Business name *",
 		setupNamePlaceholder: "e.g. King's Barbershop",
 		setupAddress: "Address",
@@ -381,7 +381,7 @@ export const dash = {
 		setupPhone: "Phone",
 		setupPhonePlaceholder: "e.g. +1 555 123 4567",
 		setupGooglePlaceholder: "https://g.page/r/...",
-		setupCreate: "Create my barbershop",
+		setupCreate: "Create my salon",
 		setupCreating: "Creating...",
 	},
 } as const;
@@ -505,20 +505,20 @@ export const bp = {
 		noWaiting: "No clients waiting",
 		hello: "Hey",
 		// Claim screen
-		claimTitle: "Barber Access ✂️",
+		claimTitle: "Staff Access ✂️",
 		claimSubtitle: "Enter the access code your manager gave you",
 		claimPlaceholder: "e.g. ABC123",
 		claimButton: "Link my account",
 		claimClaiming: "Verifying...",
 		invalidCode: "Invalid code. Please check and try again.",
 		alreadyClaimed: "This code has already been used.",
-		alreadyLinked: "Your account is already linked to another barber profile.",
+		alreadyLinked: "Your account is already linked to another staff profile.",
 		genericError: "Error linking account. Please try again.",
 		// Photo
 		changeMyPhoto: "Change my photo",
 		addMyPhoto: "Add my photo",
 		// Welcome screen
-		iAmBarber: "I'm a barber",
+		iAmBarber: "I'm a staff member",
 		iAmOwner: "I'm an owner",
 	},
 } as const;
