@@ -73,8 +73,8 @@ interface Notification {
 	language: string;
 }
 
-function playNotificationSound(clientName: string, barberName: string, language: string) {
-	if (!("speechSynthesis" in window)) return;
+function playNotificationSound(clientName: string, barberName: string, language: string, soundEnabled: boolean) {
+	if (!soundEnabled || !("speechSynthesis" in window)) return;
 
 	window.speechSynthesis.cancel();
 
@@ -104,9 +104,9 @@ function playNotificationSound(clientName: string, barberName: string, language:
 	window.speechSynthesis.speak(utterance);
 }
 
-function NotificationBanner({ notification, onComplete }: { notification: Notification; onComplete: () => void }) {
+function NotificationBanner({ notification, onComplete, soundEnabled }: { notification: Notification; onComplete: () => void; soundEnabled: boolean }) {
 	useEffect(() => {
-		playNotificationSound(notification.clientName, notification.barberName, notification.language);
+		playNotificationSound(notification.clientName, notification.barberName, notification.language, soundEnabled);
 
 		const timer = setTimeout(() => onComplete(), 5000);
 		return () => {
@@ -170,6 +170,7 @@ function QueueDisplayPage() {
 	const [notificationQueue, setNotificationQueue] = useState<Notification[]>([]);
 	const [currentNotification, setCurrentNotification] = useState<Notification | null>(null);
 	const [previousClients, setPreviousClients] = useState<Map<number, string>>(new Map());
+	const [soundEnabled, setSoundEnabled] = useState(true);
 
 	const { data: shop, isLoading: shopLoading } = useQuery({
 		queryKey: ["shopPublic", shopIdNum],
