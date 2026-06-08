@@ -3466,6 +3466,21 @@ function SettingsView({
 		},
 	});
 
+	const announceTurnMutation = useMutation({
+		mutationFn: async (newValue: boolean) => {
+			await updateShop({
+				data: {
+					id: shop.id,
+					announceTurnEnabled: newValue,
+				},
+			});
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["myShop"] });
+			queryClient.invalidateQueries({ queryKey: ["shopPublic", shop.id] });
+		},
+	});
+
 
 		const defaultHours = {
 		0: { open: "09:00", close: "18:00", closed: true },
@@ -3743,6 +3758,25 @@ function SettingsView({
 						<span
 							className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
 								showQr ? "translate-x-7" : "translate-x-1"
+							}`}
+						/>
+					</button>
+				</div>
+
+				<div className="flex items-center justify-between bg-gray-800 rounded-xl p-4">
+					<label className="text-sm font-medium text-gray-300">
+						{lang === "es" ? "Anunciar turno cuando cliente llega" : "Announce turn when client arrives"}
+					</label>
+					<button
+						type="button"
+						onClick={() => { const newVal = !announceTurnEnabled; setAnnounceTurnEnabled(newVal); announceTurnMutation.mutate(newVal); }}
+						className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+							announceTurnEnabled ? "bg-green-600" : "bg-gray-600"
+						}`}
+					>
+						<span
+							className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+								announceTurnEnabled ? "translate-x-7" : "translate-x-1"
 							}`}
 						/>
 					</button>

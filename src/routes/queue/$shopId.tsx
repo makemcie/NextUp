@@ -176,11 +176,13 @@ function QueueDisplayPage() {
 		queryFn: () => getShopPublic({ data: { shopId: shopIdNum } }),
 	});
 
-	const { data: queues, isLoading: queuesLoading } = useQuery({
+	const { data: queuesData, isLoading: queuesLoading } = useQuery({
 		queryKey: ["shopQueues", shopIdNum],
 		queryFn: () => getShopQueues({ data: { shopId: shopIdNum } }),
 		refetchInterval: 15000,
 	});
+	const queues = queuesData?.queues ?? [];
+	const announceTurnEnabled = queuesData?.announceTurnEnabled ?? true;
 
 	useEffect(() => {
 		if (!queues || !shop) return;

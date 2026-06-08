@@ -386,6 +386,8 @@ export const updateShop = createServerFn({ method: "POST" })
 			weeklyHours?: string;
 			timezone?: string;
 			whatsappNumber?: string;
+			showQr?: boolean;
+			announceTurnEnabled?: boolean;
 		}) => input,
 	)
 	.handler(async ({ data }) => {
@@ -1424,7 +1426,18 @@ export const getShopQueues = createServerFn({ method: "GET" })
 			}),
 		);
 
-		return queues;
+		// Get shop's announceTurnEnabled setting
+		const shop = await (await db())
+			.select({ announceTurnEnabled: shops.announceTurnEnabled })
+			.from(shops)
+			.where(eq(shops.id, data.shopId))
+			.limit(1)
+			.all();
+
+		return {
+			queues,
+			announceTurnEnabled: shop[0]?.announceTurnEnabled ?? true,
+		};
 	});
 
 // Call next client (move from waiting to in_service)
