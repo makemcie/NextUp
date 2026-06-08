@@ -1512,7 +1512,7 @@ function StatsView({ shopId, lang }: { shopId: number; lang: Lang }) {
 				</div>
 				{stats?.recentVisits && stats.recentVisits.length > 0 ? (
 					<div className="divide-y divide-gray-800">
-						{stats.recentVisits.map((visit) => (
+						{(showAllVisits ? stats.recentVisits : stats.recentVisits.slice(0, 5)).map((visit) => (
 							<div
 								key={visit.visitId}
 								className="px-5 py-4 flex items-center justify-between"
