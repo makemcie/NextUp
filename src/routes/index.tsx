@@ -1573,11 +1573,12 @@ function QueueView({ shopId, lang }: { shopId: number; lang: Lang }) {
 	const t = dash[lang];
 	const queryClient = useQueryClient();
 
-	const { data: queues } = useQuery({
+	const { data: queuesData } = useQuery({
 		queryKey: ["shopQueues", shopId],
 		queryFn: () => getShopQueues({ data: { shopId } }),
 		refetchInterval: 10000,
 	});
+	const queues = queuesData?.queues ?? [];
 
 	// Real-time updates
 	useWebSocket({
