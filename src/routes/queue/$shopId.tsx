@@ -355,7 +355,7 @@ function BarberQueueCard({
 						/>
 
 						<div className="min-w-0 flex-1">
-							<p className="text-white font-semibold text-sm truncate">
+							<p className="text-white font-semibold text-sm whitespace-nowrap overflow-x-auto">
 								{queue.barber.name}
 							</p>
 							{queue.barber.specialty && (

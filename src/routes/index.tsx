@@ -4559,7 +4559,7 @@ function ReportsView({ shopId, lang }: { shopId: number; lang: "en" | "es" }) {
 														<div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-400 flex-shrink-0">{name[0]?.toUpperCase()}</div>
 														<div className="flex-1 min-w-0">
 															<div className="flex justify-between items-baseline mb-1">
-																<span className="text-white text-sm font-medium truncate">{name}</span>
+																<span className="text-white text-sm font-medium whitespace-nowrap overflow-x-auto">{name}</span>
 																<span className="text-green-400 font-bold text-sm ml-2 flex-shrink-0">${(data.revenue||0).toFixed(2)}</span>
 															</div>
 															<div className="flex items-center gap-2">
@@ -4626,7 +4626,7 @@ function ReportsView({ shopId, lang }: { shopId: number; lang: "en" | "es" }) {
 												<div className="w-8 h-8 rounded-full bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-400 flex-shrink-0">{name[0]?.toUpperCase()}</div>
 												<div className="flex-1 min-w-0">
 													<div className="flex justify-between items-baseline mb-1">
-														<span className="text-white text-sm font-semibold truncate">{name}</span>
+														<span className="text-white text-sm font-semibold whitespace-nowrap overflow-x-auto">{name}</span>
 														<span className="text-green-400 font-bold text-sm ml-2 flex-shrink-0">${(data.revenue||0).toFixed(2)}</span>
 													</div>
 													<div className="flex items-center gap-2">
@@ -4695,7 +4695,7 @@ function ReportsView({ shopId, lang }: { shopId: number; lang: "en" | "es" }) {
 												<div className="w-8 h-8 rounded-full bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-400 flex-shrink-0">{name[0]?.toUpperCase()}</div>
 												<div className="flex-1 min-w-0">
 													<div className="flex justify-between items-baseline mb-1">
-														<span className="text-white text-sm font-semibold truncate">{name}</span>
+														<span className="text-white text-sm font-semibold whitespace-nowrap overflow-x-auto">{name}</span>
 														<span className="text-green-400 font-bold text-sm ml-2 flex-shrink-0">${(data.revenue||0).toFixed(2)}</span>
 													</div>
 													<div className="flex items-center gap-2">
