@@ -76,32 +76,39 @@ interface Notification {
 function playNotificationSound(clientName: string, barberName: string, language: string, soundEnabled: boolean) {
 	if (!soundEnabled || !("speechSynthesis" in window)) return;
 
-	window.speechSynthesis.cancel();
+	try {
+		window.speechSynthesis.cancel();
 
-	const isSpanish = language === "es";
-	const text = isSpanish
-		? `¡Turno para ${clientName}! Pasa con ${barberName}`
-		: `Turn for ${clientName}! Go with ${barberName}`;
+		const isSpanish = language === "es";
+		const text = isSpanish
+			? `¡Turno para ${clientName}! Pasa con ${barberName}`
+			: `Turn for ${clientName}! Go with ${barberName}`;
 
-	const utterance = new SpeechSynthesisUtterance(text);
-	utterance.lang = isSpanish ? "es-ES" : "en-US";
-	utterance.rate = 0.8;
-	utterance.pitch = 1;
-	utterance.volume = 1;
+		const utterance = new SpeechSynthesisUtterance(text);
+		utterance.lang = isSpanish ? "es-ES" : "en-US";
+		utterance.rate = 0.9;
+		utterance.pitch = 1;
+		utterance.volume = 1;
 
-	// Seleccionar voz más natural disponible
-	const voices = window.speechSynthesis.getVoices();
-	if (voices.length > 0) {
-		// Buscar voz de Google si está disponible
-		const googleVoice = voices.find(v => v.name.includes("Google") || v.name.includes("Microsoft"));
-		if (googleVoice) {
-			utterance.voice = googleVoice;
-		} else {
-			utterance.voice = voices[0];
+		// Cargar voces - puede ser asincrónico
+		const loadVoices = () => {
+			const voices = window.speechSynthesis.getVoices();
+			if (voices.length > 0) {
+				const googleVoice = voices.find(v => v.name.includes("Google") || v.name.includes("Microsoft"));
+				utterance.voice = googleVoice || voices[0];
+			}
+		};
+
+		// Esperar a que las voces estén listas
+		if (window.speechSynthesis.onvoiceschanged !== undefined) {
+			window.speechSynthesis.onvoiceschanged = loadVoices;
 		}
-	}
+		loadVoices();
 
-	window.speechSynthesis.speak(utterance);
+		window.speechSynthesis.speak(utterance);
+	} catch (error) {
+		console.error("Error playing notification sound:", error);
+	}
 }
 
 function NotificationBanner({ notification, onComplete, soundEnabled }: { notification: Notification; onComplete: () => void; soundEnabled: boolean }) {
