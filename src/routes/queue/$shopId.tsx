@@ -113,7 +113,7 @@ function NotificationBanner({ notification, onComplete, soundEnabled }: { notifi
 			clearTimeout(timer);
 			window.speechSynthesis.cancel();
 		};
-	}, [notification, onComplete]);
+	}, [notification, onComplete, soundEnabled]);
 
 	const isSpanish = notification.language === "es";
 
